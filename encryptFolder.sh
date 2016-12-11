@@ -4,137 +4,32 @@ declare -r RSA_KEY=$1
 declare -r ASEPASS=$2
 declare -r FILETARGET=$3
 declare -r WORKSPACE='E:\temp\OpenSSH\'
-declare -r CURRENT=$PWD
-
-encryptRSA()
-{
-	local RSAKEY=$RSA_KEY # $RSAKEY"_PRIV.pem"
-	local filename="$FILETARGET"
-
-	# File
-	local filepath="./"
-	local filename="Kaiba_01.mp4"
-	
-	file=$filename
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
-	
-	file=$RSAKEY
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
-	
-    file=$RSAKEY".pub.pem"
-	if [ -f "$file" ]
-	then
-		echo "$file found."
-	else
-		echo "Export publique key"
-		openssl rsa -pubout -in $RSAKEY -out $WORKSPACE".pub.pem"
-	fi	
-
-	echo "> ENCRYPT : START"
-	local ENCRYPTED_FILENAME=`echo $filename | openssl rsautl -encrypt -inkey $WORKSPACE".pub.pem" -pubin`
-	ENCRYPTED_FILENAME=`openssl enc -base64 <<< $ENCRYPTED_FILENAME`
-	
-	local HASHED_FILENAME="TEST"
-	
-	echo $ENCRYPTED_FILENAME > HASHED_FILENAME.manifest
-	
-	echo "> FILENAME : " $HASHED_FILENAME
-	openssl rsautl -encrypt -inkey $WORKSPACE".pub.pem" -pubin -in $filename -out $HASHED_FILENAME
-
-	echo "> ENCRYPT : DONE"
-	
-	exit
-}
+# declare -r CURRENT=$PWD
 
 encryptAES()
 {
-	local RSAKEY=$RSA_KEY # $RSAKEY"_PRIV.pem"
-	local AESKEY=$ASEPASS # ./key.bin.enc 
-	local filename="$FILETARGET"
-
-	# File
-	#local filepath="./"
-	#local filename="Kaiba_01.mp4"
+	local AESPASSWORD=$WORKSPACE"key.bin"
 	
-	file=$filename
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
-	
-	file=$AESKEY
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
-	
-	file=$RSAKEY
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
-	
-    file=$RSAKEY".pub.pem"
-	if [ -f "$file" ]
-	then
-		echo "$file found."
-	else
-		echo "Export publique key"
-		openssl rsa -pubout -in $RSAKEY -out $WORKSPACE".pub.pem"
-	fi
+	# If exist
+	checkfile
 
 	echo "> ENCRYPT : START"
-	echo ">> Get AES KEY"
-	openssl rsautl -decrypt -inkey $RSAKEY -in $AESKEY -out $WORKSPACE"key.bin"
 	
-	echo ">> Get Encrypted filename"
-	# temp=`echo $filename | sed 's/ /_/g'`
-	#echo $temp
-	ENCRYPTED_FILENAME=`echo $filename | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$WORKSPACE"key.bin"`
-    
-	#BASE64_SAFE=`echo $ENCRYPTED_FILENAME | sed 's/ //g'`
-	BASE64_SAFE=`echo "$ENCRYPTED_FILENAME" | tr \/ _`
-	#OUTPUT_FILENAME=`openssl rand -hex 32`
-	OUTPUT_FILENAME=$BASE64_SAFE
+	# Get AES KEY	
+	extractkey
 	
-	# echo $ENCRYPTED_FILENAME > $OUTPUT_FILENAME.manifest
+	# Encrypt File name
+	local ENCRYPTED_FILENAME=`echo $FILETARGET | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+	
+	# Convert base64 to base64 safe
+	local BASE64_SAFE=`echo "$ENCRYPTED_FILENAME" | tr \/ _`
+	local OUTPUT_FILENAME=$BASE64_SAFE
 
-	echo "> BASE64_ENCRYPTED_FILENAME : " $ENCRYPTED_FILENAME
-	echo "> SAFE_BASE64_ENCRYPTED_FILENAME : " $BASE64_SAFE
-	#echo .
-	#HEXVAL=$(xxd -pu <<< "$ENCRYPTED_FILENAME")
-	# echo "> HEX_ENCRYPTED_FILENAME : " $HEXVAL
-	#echo .
-	#ENCRYPTED_FILENAME=`echo $ENCRYPTED_FILENAME | sed 's/ /_/g'`
-	#HEXVAL=$(xxd -pu <<< "$ENCRYPTED_FILENAME")
-	#echo "> HEX_BASE64_ENCRYPTED_FILENAME : " $HEXVAL "  -  " $ENCRYPTED_FILENAME
-	#echo .
-	
-	echo ">> Encrypt $filename to $BASE64_SAFE"
-	openssl enc -aes-256-cbc -salt -in "$filename" -out "$OUTPUT_FILENAME" -pass file:$WORKSPACE"key.bin"
+	# Encrypt 
+	openssl enc -aes-256-cbc -salt -in "$FILETARGET" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
 
-	rm $WORKSPACE"key.bin"
+	# Remove secure file	
+	purge
 	
 	echo "> ENCRYPT : DONE"
 	
@@ -143,136 +38,82 @@ encryptAES()
 
 decrypt()
 {
-	local RSAKEY=$RSA_KEY # $RSAKEY"_PRIV.pem"
-	local AESKEY=$ASEPASS # ./key.bin.enc 
-	local FILE_TARGET="$FILETARGET"
-
-	file=$FILE_TARGET
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
+	local AESPASSWORD=$WORKSPACE"key.bin"
 	
-	file=$AESKEY
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
-	
-	file=$RSAKEY
-	if [ -f "$file" ]
-	then
-		echo .
-	else
-		echo "$file not found."
-		exit
-	fi
+	# If exist
+	checkfile
 	
 	echo "> DECRYPT : START"
-	openssl rsautl -decrypt -inkey $RSAKEY -in $AESKEY -out $WORKSPACE"key.bin" 
 	
-	# echo $ENCRYPTED_FILENAME > $tempname.manifest
-	#local OUTPUT_FILENAME=`echo $FILE_TARGET | xxd -r -p`
-	local BASE64_SAFE=`echo "$FILE_TARGET" | tr _ \/`
+	# Get AES KEY	
+	extractkey
+	
+	# Convert base64 safe to real base64
+	local BASE64_SAFE=`echo "$FILETARGET" | tr _ \/`
 	local OUTPUT_FILENAME=$BASE64_SAFE
 
-	echo "> FILENAME CONVERT : $FILE_TARGET > $OUTPUT_FILENAME"
+	# Decrypt filename
 	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$WORKSPACE"key.bin"`
-	echo "> FILENAME DECRYPT : " $OUTPUT_FILENAME
+	# Decrypt file
+	openssl enc -d -aes-256-cbc -in "./$FILETARGET" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
 
-	openssl enc -d -aes-256-cbc -in ./$FILE_TARGET -out $OUTPUT_FILENAME -pass file:$WORKSPACE"key.bin"
-
-	rm $WORKSPACE"key.bin"
+	# Remove secure file
+	purge
 	
 	echo "> DECRYPT : DONE"	
-	
+
 	exit
 }
 
 genkey()
 {
-	#local RSAKEY=$RSA_KEY # $RSAKEY"_PRIV.pem"
-	#local AESKEY=$ASEPASS # ./key.bin.enc 
-	#local HEXVAL="$FILETARGET"
-	
-	#Required
-	# RSAKEY=$1
-	RSAKEY=data
-
-	# File
-	filepath="./"
-	filename="Kaiba_01.mp4"
-
-	# Private Key password
-	password=dummypassword
+	local RSAKEY_PREFIX=data
+	local RSAKEY_PASSWORD=dummypassword
+	local AESPASSWORD="key.bin"
 	
 	echo "> GENKEY : START"
 	 
-	file=$RSAKEY"_PRIV.pem"
+	# Generate RSA Key Pair 
+	file=$RSAKEY_PREFIX"_PRIV.pem"
 	if [ -f "$file" ]
 	then
-		echo "$file found."
+		echo "WARNING ! $file already found."
 	else
-		echo "Generating key request for $RSAKEY"
-		openssl genrsa -passout pass:$password -out $RSAKEY"_PRIV.pem" 4096 -noout
+		echo "Generating key request for $RSAKEY_PREFIX"
+		openssl genrsa -passout pass:$RSAKEY_PASSWORD -out $RSAKEY_PREFIX"_PRIV.pem" 4096 -noout
 	fi
 
-	file=key.bin
+	# Generate random AES Password
+	file=$AESPASSWORD
 	if [ -f "$file" ]
 	then
-		echo "$file found."
+		echo "WARNING ! $file already found."
+		exit
 	else
 		echo "Generate a 256 bit (32 byte) random key"
-		openssl rand -base64 32 > key.bin
+		openssl rand -base64 32 > $WORKSPACE$AESPASSWORD
 	fi
 
-	file=$RSAKEY"_PUB.pem"
+	# Export Public key
+	file=$RSAKEY_PREFIX"_PUB.pem"
+	if [ ! -f "$file" ]
+	then
+		openssl rsa -pubout -in $RSAKEY_PREFIX"_PRIV.pem" -out $RSAKEY_PREFIX"_PUB.pem"
+	fi
+
+	# Encrypt AES Password
+	file=$AESPASSWORD".enc"
 	if [ -f "$file" ]
 	then
-		echo "$file found."
+		echo "WARNING ! $file already found."
+		exit
 	else
-		echo "Export publique key"
-		openssl rsa -pubout -in $RSAKEY"_PRIV.pem" -out $RSAKEY"_PUB.pem"
+		openssl rsautl -encrypt -inkey $RSAKEY_PREFIX"_PUB.pem" -pubin -in $WORKSPACE$AESPASSWORD -out $AESPASSWORD".enc "
 	fi
 
-	file=key.bin.enc
-	if [ -f "$file" ]
-	then
-		echo "$file found."
-	else
-		echo "Encrypt AES KEY"
-		openssl rsautl -encrypt -inkey $RSAKEY"_PUB.pem" -pubin -in key.bin -out key.bin.enc 
-	fi
-
-	# openssl enc -aes-256-cbc -salt -in "Kaiba_01.mp4" -out "Kaiba_01.mp4.enc" -pass file:./key.bin
-
-	# echo "> ENCCRYPT : START"
-	# testt=`echo $filename | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:./key.bin`
-	# openssl enc -aes-256-cbc -salt -in "Kaiba_01.mp4" -out $testt".enc" -pass file:./key.bin
-
-	# echo "> FILENAME : " $testt
-	# HEXVAL=$(xxd -pu <<< "$testt")
-	# echo "> FILENAME : " $HEXVAL
-	# openssl enc -aes-256-cbc -salt -in $filename -out $HEXVAL -pass file:./key.bin
-
-	# echo "> ENCCRYPT : DONE"
-
-	# echo "> DECRYPT : START"
-	# openssl rsautl -decrypt -inkey $RSAKEY"_PRIV.pem" -in ./key.bin.enc -out ./decrypt/key.bin 
-	# filename=`echo $HEXVAL | xxd -r -p`
-	# echo "> FILENAME : " $filename
-	# filename=`echo $filename | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:./decrypt/key.bin`
-	# echo "> FILENAME : " $filename
-
-	# openssl enc -d -aes-256-cbc -in ./$HEXVAL -out ./decrypt/$filename -pass file:./decrypt/key.bin
-
-	rm ./decrypt/key.bin
+	# Remove secure file
+	purge
+	
 	echo "> GENKEY : DONE"
 }
 
@@ -284,8 +125,7 @@ menu()
 	do
 		case $opt in
 			"encrypt")
-				 encryptAES
-				#encryptRSA
+				encryptAES
 				;;
 			"decrypt")
 				decrypt
@@ -303,9 +143,44 @@ menu()
 	exit
 }
 
+checkfile()
+{
+	file=$FILETARGET
+	if [ ! -f "$file" ]
+	then
+		echo "$file not found."
+		exit
+	fi
+	
+	file=$ASEPASS
+	if [ ! -f "$file" ]
+	then
+		echo "$file not found."
+		exit
+	fi
+	
+	file=$RSA_KEY
+	if [ ! -f "$file" ]
+	then
+		echo "$file not found."
+		exit
+	fi
+}
+
+extractkey()
+{
+	# Get AES KEY	
+	local file=$WORKSPACE"key.bin"
+	if [ ! -f "$file" ]
+	then
+		openssl rsautl -decrypt -inkey "$RSA_KEY" -in "$ASEPASS" -out "$file"
+	fi
+}
+
 purge()
 {
-	rm $WORKSPACE"key.bin"
+	local AESPASSWORD="key.bin"
+	rm $WORKSPACE$AESPASSWORD
 }
 
 ######
