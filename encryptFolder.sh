@@ -17,7 +17,7 @@ declare -r TARGET="$3"
 declare -r FILE_RSA_PRIV_KEY="$1"
 declare -r FILE_RSA_PRIV_KEY_PASSWORD=$(windowsPathConverter "$FOLDER_WORKSPACE""_test.lock")
 declare -r FILE_AES_PASSWORD_ENCRYPTED="$2"
-declare -r FILE_AES_PASSWORD_DECRYPTED=$FOLDER_WORKSPACE"key.bin"
+declare -r FILE_AES_PASSWORD_DECRYPTED=$(windowsPathConverter "$FOLDER_WORKSPACE"".bin")
 declare -r FOLDER_OUTPUT_ENCRYPTED_DATA=$PWD"/OUTPUT/"
 declare -r FOLDER_OUTPUT_DECRYPTED_DATA=$PWD"/OUTPUT_CLEAR/"
 
@@ -45,7 +45,6 @@ encryptFile(){
 	local file="$1"
 	local fileName=$(basename "$1")
 	local lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA
-	local lFILE_RSA_PRIV_KEY_PASSWORD=$(windowsPathConverter "$FILE_RSA_PRIV_KEY_PASSWORD")
 
 	if [ -n "$2" ]
 	then
@@ -78,7 +77,7 @@ encryptFile(){
 	# Generate signature
 	local lRSA_PRIV_KEY=$FOLDER_WORKSPACE"data_PRIV.pem"
 	local lRSA_PUB_KEY=$FOLDER_WORKSPACE"data_PUB.pem"
-	openssl dgst -passin file:"$lFILE_RSA_PRIV_KEY_PASSWORD" -sha256 -sign "$lRSA_PRIV_KEY" -out "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
+	openssl dgst -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -sha256 -sign "$lRSA_PRIV_KEY" -out "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
 	checkError $?
 
 	# Check signature
@@ -357,11 +356,10 @@ decryptfromString()
 genkey()
 {
 	local RSAKEY_PREFIX=data
-	local lRSAKEY_PASSWORD=""
-	local lRSA_PRIV_KEY=$(windowsPathConverter "$FOLDER_WORKSPACE$RSAKEY_PREFIX""_PRIV.pem")
-	local lRSA_PUB_KEY=$(windowsPathConverter "$FOLDER_WORKSPACE$RSAKEY_PREFIX""_PUB.pem")
-	local lAESPASSWORD_enc=$(windowsPathConverter "$FILE_AES_PASSWORD_DECRYPTED"".enc")
-	local lFILE_RSA_PRIV_KEY_PASSWORD=$(windowsPathConverter "$FILE_RSA_PRIV_KEY_PASSWORD")
+	local lRSAKEY_PASSWORD="dummypassword"
+	local lRSA_PRIV_KEY=$FOLDER_WORKSPACE$RSAKEY_PREFIX"_PRIV.pem"
+	local lRSA_PUB_KEY=$FOLDER_WORKSPACE$RSAKEY_PREFIX"_PUB.pem"
+	local lAESPASSWORD_enc=$FILE_AES_PASSWORD_DECRYPTED".enc"
 
 	# Get RSA_PRIV_KEY_PASSWORD
 	read -p "> Your password ? " lRSAKEY_PASSWORD
@@ -377,8 +375,11 @@ genkey()
 		echo "WARNING ! $file already found."
 		exit 1
 	else
-		echo "Generating key $lRSA_PRIV_KEY"
-		openssl genrsa -aes256 -passout file:"$lFILE_RSA_PRIV_KEY_PASSWORD" -out "$lRSA_PRIV_KEY" 4096 -noout
+		echo "Generating 
+		
+		
+		 $lRSA_PRIV_KEY"
+		openssl genrsa -aes256 -passout file:"$FILE_RSA_PRIV_KEY_PASSWORD" -out "$lRSA_PRIV_KEY" 4096 -noout
 		checkError $?		
 	fi
 
@@ -399,7 +400,7 @@ genkey()
 	file=$lRSA_PUB_KEY
 	if [ ! -f "$file" ]
 	then
-		openssl rsa -passin file:"$lFILE_RSA_PRIV_KEY_PASSWORD" -pubout -in "$lRSA_PRIV_KEY" -out "$lRSA_PUB_KEY"
+		openssl rsa -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -pubout -in "$lRSA_PRIV_KEY" -out "$lRSA_PUB_KEY"
 		checkError $?		
 	fi
 
@@ -410,7 +411,7 @@ genkey()
 		echo "WARNING ! $file already found."
 		exit 1
 	else
-		openssl rsautl -passin file:"$lFILE_RSA_PRIV_KEY_PASSWORD" -encrypt -inkey "$lRSA_PUB_KEY" -pubin -in "$FILE_AES_PASSWORD_DECRYPTED" -out "$lAESPASSWORD_enc"
+		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -encrypt -inkey "$lRSA_PUB_KEY" -pubin -in "$FILE_AES_PASSWORD_DECRYPTED" -out "$lAESPASSWORD_enc"
 		checkError $?		
 	fi
 
@@ -539,7 +540,7 @@ extractkey()
 	file=$FILE_AES_PASSWORD_DECRYPTED
 	if [ ! -f "$file" ]
 	then
-		openssl rsautl -passin file:$FILE_RSA_PRIV_KEY_PASSWORD -decrypt -inkey "$FILE_RSA_PRIV_KEY" -in "$FILE_AES_PASSWORD_ENCRYPTED" -out "$file"
+		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -decrypt -inkey "$FILE_RSA_PRIV_KEY" -in "$FILE_AES_PASSWORD_ENCRYPTED" -out "$file"
 		checkError $?
 	fi
 
@@ -550,8 +551,8 @@ checkError()
 	if [ $1 -ne 0 ]; then
 		echo FAIL
 		# Remove secure file
-		purge $FILE_AES_PASSWORD_DECRYPTED
-		purge $FILE_RSA_PRIV_KEY_PASSWORD			
+		purge "$FILE_AES_PASSWORD_DECRYPTED"
+		purge "$FILE_RSA_PRIV_KEY_PASSWORD"			
 		exit 1
 	fi
 }
@@ -570,8 +571,8 @@ purge()
 # Main method
 ######
 main() {
-	#menu
-	genkey
+	menu
+	#genkey
 }
 
 main "$@"
