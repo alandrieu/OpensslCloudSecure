@@ -37,10 +37,10 @@ encryptAES()
 	fi
 }
 
-#####
+#
 # Encrypt $1 file
-# [optional] $2 outputDIR
-#####
+# [optional] add $2 like aditionnal folder
+#
 encryptFile(){
 	local file="$1"
 	local fileName=$(basename "$1")
@@ -56,8 +56,6 @@ encryptFile(){
 	fileExist "$file"
 	folderExist "$lOUTPUTDIR"
 
-	#	echo "> Encrypt $fileName : start"
-	
 	# Get AES KEY	
 	extractkey
 
@@ -105,16 +103,13 @@ encryptFolder(){
 	
 			if [ -n "$folderFullPath" ]
 			then
-				folderFullPath="$folderFullPath\\$2"
+				folderFullPath="$folderFullPath/$2"
 			else
 				folderFullPath=$folderFullPath$2
 			fi
 
-			echo "FOLDER = $folderFullPath"
-
 			local result=$(encryptFolderName "$folderName" "$folderFullPath")
-			echo "RESULT = $folderFullPath\\$result"
-			result="$folderFullPath\\$result"
+			result="$folderFullPath/$result"
 			encryptFolder "${file}" "$result"
 		fi
 	done
@@ -125,7 +120,7 @@ encryptFolder(){
 }
 
 #
-# Encrypt and Create folder
+# Encrypt folder name and create folder with encrypted folder name
 #
 encryptFolderName(){
 	local folderName="$1"
@@ -164,15 +159,12 @@ encryptFolderName(){
 decryptAES()
 {
 	result=$(checkfolder "$TARGET")
-	#echo $result
-
+	
 	if [[ $result = "0" ]]
 	then
-		#echo "ENCRYPT a directory"
 		decryptFolder "$TARGET"
 	elif [[ $result = "1" ]]
 	then
-		#echo "ENCRYPT a file"
 		decryptFile "$TARGET"
 	else
 		echo "ERROR - $result is not valid"
@@ -180,10 +172,10 @@ decryptAES()
 	fi
 }
 
-#####
-# Encrypt $1 file
-# [optional] $2 outputDIR
-#####
+# 
+# Decrypt $1 file
+# [optional] add $2 like aditionnal folder
+# 
 decryptFile()
 {
 	local file="$1"
@@ -220,7 +212,7 @@ decryptFile()
 }
 
 #
-# 
+# Check if $1 is corrupted
 #
 chekcSingFile()
 {
@@ -245,7 +237,7 @@ chekcSingFile()
 }
 
 #
-# Recursive folder parsing
+# Recursive folder parsing for decrypt
 #
 decryptFolder(){
 	local folderFullPath=""
@@ -268,16 +260,13 @@ decryptFolder(){
 	
 			if [ -n "$folderFullPath" ]
 			then
-				folderFullPath="$folderFullPath\\$2"
+				folderFullPath="$folderFullPath/$2"
 			else
 				folderFullPath=$folderFullPath$2
 			fi
 
-			echo "FOLDER = $folderFullPath"
-
 			local result=$(decryptFolderName "$folderName" "$folderFullPath")
-			echo "RESULT = $folderFullPath\\$result"
-			result="$folderFullPath\\$result"
+			result="$folderFullPath/$result"
 			decryptFolder "${file}" "$result"
 		fi
 	done
@@ -288,7 +277,7 @@ decryptFolder(){
 }
 
 #
-# decrypt and Create folder
+# Decrypt folder name and create folder with clear folder name
 #
 decryptFolderName(){
 	local folderName="$1"
@@ -326,6 +315,9 @@ decryptFolderName(){
 	echo "$DECRYPTED_FOLDERNAME"
 }
 
+# 
+# Decrypt file or folder name
+#
 decryptfromString()
 {
 	local fileName=""
@@ -353,6 +345,9 @@ decryptfromString()
 	echo "> Decrypt : $OUTPUT_FILENAME"
 }
 
+# 
+# Generate RSA KeyPair
+#
 genkey()
 {
 	local RSAKEY_PREFIX=data
@@ -422,8 +417,9 @@ genkey()
 	echo "> GENKEY : DONE"
 }
 
-
-
+#
+# Startup menu
+#
 menu()
 {
 	PS3='Please enter your choice: '
@@ -457,10 +453,11 @@ menu()
 	exit
 }
 
-# 1 : $TARGET 
-# 2 : $FILE_AES_PASSWORD_ENCRYPTED 
-# 3 : $FILE_RSA_PRIV_KEY
-# 4 : OUTPUTFOLDER
+#
+# Required files for this script
+# 1 : $FILE_AES_PASSWORD_ENCRYPTED 
+# 2 : $FILE_RSA_PRIV_KEY
+#
 checkOpenSSLfile()
 {
 	local file="$1"
@@ -479,6 +476,9 @@ checkOpenSSLfile()
 	fi
 }
 
+#
+# Check if file exist
+#
 fileExist()
 {
 	local file="$1"
@@ -489,7 +489,9 @@ fileExist()
 	fi
 }
 
-
+#
+# Check if folder exist
+#
 folderExist()
 {
 	local folder="$1"
@@ -501,7 +503,7 @@ folderExist()
 }
 
 #
-# Return value
+# Check $1 type and return value
 # 0 = FOLDER
 # 1 = FILE
 #
@@ -524,6 +526,9 @@ checkfolder()
 	echo "$myresult"
 }
 
+#
+# Create FILE_RSA_PRIV_KEY_PASSWORD and FILE_AES_PASSWORD_DECRYPTED
+#
 extractkey()
 {
 	# Get AES KEY	
@@ -550,6 +555,7 @@ checkError()
 {
 	if [ $1 -ne 0 ]; then
 		echo FAIL
+
 		# Remove secure file
 		purge "$FILE_AES_PASSWORD_DECRYPTED"
 		purge "$FILE_RSA_PRIV_KEY_PASSWORD"			
@@ -572,7 +578,6 @@ purge()
 ######
 main() {
 	menu
-	#genkey
 }
 
 main "$@"
