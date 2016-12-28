@@ -1,13 +1,13 @@
 #!/bin/bash
 
-declare -r FOLDER_WORKSPACE='E:\temp\OpenSSH\'
+declare -r FOLDER_WORKSPACE="/e/temp/OpenSSH/"
 declare -r TARGET="$3"
 declare -r FILE_RSA_PRIV_KEY="$1"
 declare -r FILE_RSA_PRIV_KEY_PASSWORD=$FOLDER_WORKSPACE"_test.lock"
 declare -r FILE_AES_PASSWORD_ENCRYPTED="$2"
 declare -r FILE_AES_PASSWORD_DECRYPTED=$FOLDER_WORKSPACE"key.bin"
-declare -r FOLDER_OUTPUT_ENCRYPTED_DATA='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT\'
-declare -r FOLDER_OUTPUT_CLEAR_DATA='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT_CLEAR\'
+declare -r FOLDER_OUTPUT_ENCRYPTED_DATA=$PWD"/OUTPUT/"
+declare -r FOLDER_OUTPUT_DECRYPTED_DATA=$PWD"/OUTPUT_CLEAR/"
 
 encryptAES()
 {
@@ -36,7 +36,7 @@ encryptFile(){
 
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2'\'
+		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2"/"
 	fi
 
     # If exist
@@ -121,7 +121,7 @@ encryptFolderName(){
 	
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2'\'
+		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2"/"
 	fi
 
     # If exist
@@ -176,11 +176,11 @@ decryptFile()
 {
 	local file="$1"
 	local fileName=$(basename "$1")
-	local lOUTPUTDIR=$FOLDER_OUTPUT_CLEAR_DATA
+	local lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA
 
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_CLEAR_DATA$2'\'
+		lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA$2"/"
 	fi
 
     # If exist
@@ -280,11 +280,11 @@ decryptFolder(){
 #
 decryptFolderName(){
 	local folderName="$1"
-	local lOUTPUTDIR="$FOLDER_OUTPUT_CLEAR_DATA"
+	local lOUTPUTDIR="$FOLDER_OUTPUT_DECRYPTED_DATA"
 	
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_CLEAR_DATA$2'\'
+		lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA$2"/"
 	fi
 
     # If exist
