@@ -31,7 +31,7 @@ exit 1
 
 #####
 # Encrypt $1 file
-# $2 outputDIR
+# [optional] $2 outputDIR
 #####
 encryptFile(){
 	local file="$1"
@@ -48,7 +48,7 @@ encryptFile(){
 	fileExist "$file"
 	folderExist "$lOUTPUTDIR"
 
-	echo "> Encrypt $fileName : start"
+	#	echo "> Encrypt $fileName : start"
 	
 	# Get AES KEY	
 	extractkey
@@ -56,29 +56,21 @@ encryptFile(){
 	# Encrypt File name
 	local ENCRYPTED_FILENAME=`echo $fileName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
 
-	# Create filename with SHA256
-#	local ENCRYPTED_FILENAME_SHA256=`echo $ENCRYPTED_FILENAME | openssl dgst -sha256`
-#	ENCRYPTED_FILENAME_SHA256=${ENCRYPTED_FILENAME_SHA256#*= }
-
-	# Create Manifest file
-#	local FILE_MANIFEST=$lOUTPUTDIR$ENCRYPTED_FILENAME".manifest"
-	
-#	touch $FILE_MANIFEST
-#	echo $ENCRYPTED_FILENAME_SHA256 > $FILE_MANIFEST
-
-	# Inject encrypted base64 filename
-#	`echo $file | openssl enc -base64 -e -aes-256-cbc -nosalt -out $FILE_MANIFEST -pass file:$AESPASSWORD`
-
-#	echo .
-#	echo "$FILE_MANIFEST"
-#	echo .
-	
 	# Convert base64 to base64 safe
 	local BASE64_SAFE=`echo "$ENCRYPTED_FILENAME" | tr \/ _`
 	local OUTPUT_FILENAME=$lOUTPUTDIR$BASE64_SAFE
+	local OUTPUT_FILENAME_SING=$lOUTPUTDIR$BASE64_SAFE".sha256"
 	
 	# Encrypt 
 	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
+
+	# Generate signature
+	local lRSA_PRIV_KEY=$WORKSPACE"data_PRIV.pem"
+	local lRSA_PUB_KEY=$WORKSPACE"data_PUB.pem"
+	openssl dgst -sha256 -sign "$lRSA_PRIV_KEY" -out "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
+
+	# Check signature
+	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
 
 	# Remove secure file	
 	purge $AESPASSWORD
@@ -87,19 +79,33 @@ encryptFile(){
 	echo "> Output directory : $lOUTPUTDIR"	
 }
 
+#
+# Recursive folder parsing
+#
 encryptFolder(){
+	local folderFullPath=""
+
 	for file in "$1"/*
 	do
 		if [ ! -d "${file}" ]
 		then
-			#echo "${file} is a file"
-			#local folderName=$(basename "$1")
+		echo .
 			encryptFile "${file}" "$2"
 		else
-			#echo "${file}"
 			local folderName=$(basename "${file}")
-			#echo $folderName
-			local result=$(encryptFolderName "$folderName")
+	
+			if [ -n "$folderFullPath" ]
+			then
+				folderFullPath="$folderFullPath\\$2"
+			else
+				folderFullPath=$folderFullPath$2
+			fi
+
+			echo "FOLDER = $folderFullPath"
+
+			local result=$(encryptFolderName "$folderName" "$folderFullPath")
+			echo "RESULT = $folderFullPath\\$result"
+			result="$folderFullPath\\$result"
 			encryptFolder "${file}" "$result"
 		fi
 	done
@@ -146,7 +152,7 @@ encryptFolderName(){
 	echo "$BASE64_SAFE"
 }
 
-decrypt()
+decryptFile()
 {
 	# If exist
 	checkfile $TARGET $ASEPASS $RSA_KEY
@@ -171,6 +177,25 @@ decrypt()
 	echo "> DECRYPT : DONE"	
 
 	exit
+}
+
+decryptAES()
+{
+	result=$(checkfolder "$TARGET")
+	#echo $result
+
+	if [[ $result = "0" ]]
+	then
+		#echo "ENCRYPT a directory"
+		decryptFolder "$TARGET"
+	elif [[ $result = "1" ]]
+	then
+		#echo "ENCRYPT a file"
+		decryptFile "$TARGET"
+	else
+		echo "ERROR - $result is not valid"
+		exit 1
+	fi
 }
 
 genkey()
@@ -305,10 +330,10 @@ fileExist()
 
 folderExist()
 {
-	local file="$1"
-	if [ ! -d "$file" ]
+	local folder="$1"
+	if [ ! -d "$folder" ]
 	then
-		echo "$file not found."
+		echo "folder $folder not found."
 		exit 1
 	fi
 }
@@ -359,7 +384,8 @@ purge()
 main() {
 	#menuconsole
 	#menu	
-	encryptAES
+	#encryptAES
+	decryptAES
 }
 
 main "$@"
