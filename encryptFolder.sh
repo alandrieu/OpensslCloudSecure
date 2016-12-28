@@ -6,27 +6,23 @@ declare -r TARGET="$3"
 declare -r WORKSPACE='E:\temp\OpenSSH\'
 declare -r AESPASSWORD=$WORKSPACE"key.bin"
 declare -r OUTPUTDIR='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT\'
+declare -r OUTPUTDIR2='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT_CLEAR\'
 # declare -r CURRENT=$PWD
 
 encryptAES()
 {
 	result=$(checkfolder "$TARGET")
-	#echo $result
 
 	if [[ $result = "0" ]]
 	then
-		#echo "ENCRYPT a directory"
 		encryptFolder "$TARGET"
 	elif [[ $result = "1" ]]
 	then
-		#echo "ENCRYPT a file"
 		encryptFile "$TARGET"
 	else
 		echo "ERROR - $result is not valid"
 		exit 1
 	fi
-
-exit 1
 }
 
 #####
@@ -152,33 +148,6 @@ encryptFolderName(){
 	echo "$BASE64_SAFE"
 }
 
-decryptFile()
-{
-	# If exist
-	checkfile $TARGET $ASEPASS $RSA_KEY
-	
-	echo "> DECRYPT : START"
-	
-	# Get AES KEY	
-	extractkey
-	
-	# Convert base64 safe to real base64
-	local BASE64_SAFE=`echo "$TARGET" | tr _ \/`
-	local OUTPUT_FILENAME=$BASE64_SAFE
-
-	# Decrypt filename
-	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$WORKSPACE"key.bin"`
-	# Decrypt file
-	openssl enc -d -aes-256-cbc -in "./$TARGET" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
-
-	# Remove secure file
-	purge $AESPASSWORD
-	
-	echo "> DECRYPT : DONE"	
-
-	exit
-}
-
 decryptAES()
 {
 	result=$(checkfolder "$TARGET")
@@ -196,6 +165,174 @@ decryptAES()
 		echo "ERROR - $result is not valid"
 		exit 1
 	fi
+}
+
+#####
+# Encrypt $1 file
+# [optional] $2 outputDIR
+#####
+decryptFile()
+{
+	local file="$1"
+	local fileName=$(basename "$1")
+	local lOUTPUTDIR=$OUTPUTDIR2
+
+	if [ -n "$2" ]
+	then
+		lOUTPUTDIR=$OUTPUTDIR2$2'\'
+	fi
+
+    # If exist
+	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
+	fileExist "$file"
+	folderExist "$lOUTPUTDIR"
+
+	echo "> Decrypt $fileName : start"
+	
+	# Get AES KEY	
+	extractkey
+
+	# Convert base64 safe to real base64
+	local BASE64_SAFE=`echo "$fileName" | tr _ \/`
+	local OUTPUT_FILENAME=$BASE64_SAFE
+
+	# Decrypt filename
+	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+
+	# Decrypt file
+	openssl enc -d -aes-256-cbc -in "$file" -out "$lOUTPUTDIR$OUTPUT_FILENAME" -pass file:$AESPASSWORD
+
+	# Remove secure file	
+	purge $AESPASSWORD
+	
+	echo "> Decrypt $fileName : done"
+	echo "> Output directory : $lOUTPUTDIR"		
+}
+
+#
+# {TODO}
+#
+chekcSingFile()
+{
+	local file="$1"
+	local fileName=$(basename "$1")
+	filename="${filename%.*}"
+	
+	local lOUTPUTDIR=$OUTPUTDIR2
+
+	if [ -n "$2" ]
+	then
+		lOUTPUTDIR=$OUTPUTDIR2$2'\'
+	fi
+
+    # If exist
+	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
+	fileExist "$file"
+	folderExist "$lOUTPUTDIR"
+
+	echo "> Check signature $fileName : start"
+	
+	# Get AES KEY	
+	extractkey
+
+	# Convert base64 safe to real base64
+	local BASE64_SAFE=`echo "$fileName" | tr _ \/`
+	local OUTPUT_FILENAME=$BASE64_SAFE
+
+	# Generate signature
+	local lRSA_PUB_KEY=$WORKSPACE"data_PUB.pem"
+	local OUTPUT_FILENAME_SING=$lOUTPUTDIR$BASE64_SAFE".sha256"	
+
+	# Check signature
+	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
+
+	# Remove secure file	
+	purge $AESPASSWORD
+	
+	echo "> Check signature $fileName : done"	
+}
+
+#
+# Recursive folder parsing
+#
+decryptFolder(){
+	local folderFullPath=""
+
+	for file in "$1"/*
+	do
+		if [ ! -d "${file}" ]
+		then
+			local filename=$(basename "${file}")
+			local extension="${filename##*.}"
+
+			if [[ "$extension" = ".sha256" ]]
+			then
+			echo .
+				#chekcSingFile "${file}" "$2"
+			else
+				decryptFile "${file}" "$2"
+			fi
+		else
+			local folderName=$(basename "${file}")
+	
+			if [ -n "$folderFullPath" ]
+			then
+				folderFullPath="$folderFullPath\\$2"
+			else
+				folderFullPath=$folderFullPath$2
+			fi
+
+			echo "FOLDER = $folderFullPath"
+
+			local result=$(decryptFolderName "$folderName" "$folderFullPath")
+			echo "RESULT = $folderFullPath\\$result"
+			result="$folderFullPath\\$result"
+			decryptFolder "${file}" "$result"
+		fi
+	done
+}
+
+#
+# decrypt and Create folder
+#
+decryptFolderName(){
+	local folderName="$1"
+	local lOUTPUTDIR="$OUTPUTDIR2"
+	
+	if [ -n "$2" ]
+	then
+		lOUTPUTDIR=$OUTPUTDIR2$2'\'
+	fi
+
+    # If exist
+	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
+	folderExist "$lOUTPUTDIR"
+
+	#echo "> decrypt folder $folderName : start"
+	
+	# Get AES KEY	
+	extractkey
+
+	# Convert base64 safe to real base64
+	local BASE64_SAFE=`echo "$folderName" | tr _ \/`
+	local OUTPUT_FOLDERNAME=$BASE64_SAFE
+
+	# Decrypt filename
+	DECRYPTED_FOLDERNAME=`echo $OUTPUT_FOLDERNAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+
+	local OUTPUT_FOLDERNAME="$lOUTPUTDIR$DECRYPTED_FOLDERNAME"
+	
+	# Check if output folder already exist
+	if [ ! -d "$OUTPUT_FOLDERNAME" ]
+	then
+		mkdir "$OUTPUT_FOLDERNAME"
+	fi
+
+	# Remove secure file	
+	purge $AESPASSWORD
+	
+	#echo "> decrypt folder $folderName : done"
+	echo "$DECRYPTED_FOLDERNAME"
 }
 
 genkey()
