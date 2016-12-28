@@ -210,45 +210,26 @@ decryptFile()
 }
 
 #
-# {TODO}
+# 
 #
 chekcSingFile()
 {
 	local file="$1"
-	local fileName=$(basename "$1")
-	filename="${filename%.*}"
+	file="${file%.*}"
 	
-	local lOUTPUTDIR=$OUTPUTDIR2
-
-	if [ -n "$2" ]
-	then
-		lOUTPUTDIR=$OUTPUTDIR2$2'\'
-	fi
-
     # If exist
 	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
 	fileExist "$file"
-	folderExist "$lOUTPUTDIR"
 
 	echo "> Check signature $fileName : start"
 	
-	# Get AES KEY	
-	extractkey
-
-	# Convert base64 safe to real base64
-	local BASE64_SAFE=`echo "$fileName" | tr _ \/`
-	local OUTPUT_FILENAME=$BASE64_SAFE
-
 	# Generate signature
 	local lRSA_PUB_KEY=$WORKSPACE"data_PUB.pem"
-	local OUTPUT_FILENAME_SING=$lOUTPUTDIR$BASE64_SAFE".sha256"	
+	local OUTPUT_FILENAME_SING=$file".sha256"	
 
 	# Check signature
-	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
+	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$file"
 
-	# Remove secure file	
-	purge $AESPASSWORD
-	
 	echo "> Check signature $fileName : done"	
 }
 
@@ -265,10 +246,9 @@ decryptFolder(){
 			local filename=$(basename "${file}")
 			local extension="${filename##*.}"
 
-			if [[ "$extension" = ".sha256" ]]
+			if [[ "$extension" = "sha256" ]]
 			then
-			echo .
-				#chekcSingFile "${file}" "$2"
+				chekcSingFile "${file}"
 			else
 				decryptFile "${file}" "$2"
 			fi
@@ -335,6 +315,31 @@ decryptFolderName(){
 	echo "$DECRYPTED_FOLDERNAME"
 }
 
+decryptfromString()
+{
+	local fileName=""
+
+	read -p "> Your file or folder name ? " fileName
+	
+    # If exist
+	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
+
+	# Get AES KEY	
+	extractkey
+
+	# Convert base64 safe to real base64
+	local BASE64_SAFE=`echo "$fileName" | tr _ \/`
+	local OUTPUT_FILENAME=$BASE64_SAFE
+
+	# Decrypt filename
+	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+
+	# Remove secure file	
+	purge $AESPASSWORD
+
+	echo "> Decrypt : $OUTPUT_FILENAME"
+}
+
 genkey()
 {
 	local RSAKEY_PREFIX=data
@@ -392,7 +397,7 @@ genkey()
 menu()
 {
 	PS3='Please enter your choice: '
-	options=("encrypt" "decrypt" "genkey" "Quit")
+	options=("encrypt" "decrypt" "genkey" "decryptString" "Quit")
 	select opt in "${options[@]}"
 	do
 		case $opt in
@@ -400,11 +405,14 @@ menu()
 				encryptAES
 				;;
 			"decrypt")
-				decrypt
+				decryptAES
 				;;
 			"genkey")
 				genkey
 				;;
+			"decryptString")
+				decryptfromString
+				;;				
 			"Quit")
 				break
 				;;
@@ -520,9 +528,9 @@ purge()
 ######
 main() {
 	#menuconsole
-	#menu	
+	menu	
 	#encryptAES
-	decryptAES
+	#decryptAES
 }
 
 main "$@"
