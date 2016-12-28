@@ -5,6 +5,7 @@ declare -r ASEPASS="$2"
 declare -r FILETARGET="$3"
 declare -r WORKSPACE='E:\temp\OpenSSH\'
 declare -r AESPASSWORD=$WORKSPACE"key.bin"
+declare -r OUTPUTDIR='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\'
 # declare -r CURRENT=$PWD
 
 encryptAES()
@@ -34,7 +35,7 @@ exit 1
 # Ecnrypt $1 file
 #####
 encryptFile(){
-	local file=$1
+	local file=$(basename "$1")
 
     # If exist
 	checkfile "$file" "$ASEPASS" "$RSA_KEY"
@@ -43,29 +44,40 @@ encryptFile(){
 	
 	# Get AES KEY	
 	extractkey
-	
+
+	#filename=$(basename "$file")
+	#echo $filename
+	#extension="${filename##*.}"
+	#echo $extension
+	#filename="${filename%.*}"
+	#echo $filename
+
 	# Encrypt File name
 	local ENCRYPTED_FILENAME=`echo $file | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
-	local ENCRYPTED_FILENAME_2=`echo $file | openssl enc -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+
+	# Create filename with SHA256
+	local ENCRYPTED_FILENAME_SHA256=`echo $ENCRYPTED_FILENAME | openssl dgst -sha256`
+	ENCRYPTED_FILENAME_SHA256=${ENCRYPTED_FILENAME_SHA256#*= }
+
+	# Create Manifest file
+	local FILE_MANIFEST=$OUTPUTDIR$ENCRYPTED_FILENAME_SHA256".manifest"
 	
-	local ENCRYPTED_FILENAME_2B64=`echo $ENCRYPTED_FILENAME_2 | base64`
-	local ENCRYPTED_FILENAME_2B64SHA256=`echo $ENCRYPTED_FILENAME_2 | openssl dgst -sha256`
-	ENCRYPTED_FILENAME_2B64SHA256=${ENCRYPTED_FILENAME_2B64SHA256#*= }  
+	touch $FILE_MANIFEST
+
+	# Inject encrypted base64 filename
+	`echo $file | openssl enc -base64 -e -aes-256-cbc -nosalt -out $FILE_MANIFEST -pass file:$AESPASSWORD`
 
 	echo .
-	echo "$ENCRYPTED_FILENAME_2B64"
-	echo .
-
-	echo .
-	echo "$ENCRYPTED_FILENAME_2B64SHA256"
+	echo "$FILE_MANIFEST"
 	echo .
 	
 	# Convert base64 to base64 safe
 	local BASE64_SAFE=`echo "$ENCRYPTED_FILENAME" | tr \/ _`
 	local OUTPUT_FILENAME=$BASE64_SAFE
+	
 
 	# Encrypt 
-	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
+	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUTDIR$OUTPUT_FILENAME" -pass file:$AESPASSWORD
 
 	# Remove secure file	
 	purge $AESPASSWORD
