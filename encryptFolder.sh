@@ -7,7 +7,7 @@ declare -r WORKSPACE='E:\temp\OpenSSH\'
 declare -r AESPASSWORD=$WORKSPACE"key.bin"
 declare -r OUTPUTDIR='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT\'
 declare -r OUTPUTDIR2='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT_CLEAR\'
-# declare -r CURRENT=$PWD
+declare -r RSAKEY_PASSWORD_FILE=$WORKSPACE"_test.lock"
 
 encryptAES()
 {
@@ -63,14 +63,11 @@ encryptFile(){
 	# Generate signature
 	local lRSA_PRIV_KEY=$WORKSPACE"data_PRIV.pem"
 	local lRSA_PUB_KEY=$WORKSPACE"data_PUB.pem"
-	openssl dgst -sha256 -sign "$lRSA_PRIV_KEY" -out "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
+	openssl dgst -passin file:$RSAKEY_PASSWORD_FILE -sha256 -sign "$lRSA_PRIV_KEY" -out "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
 
 	# Check signature
 	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
 
-	# Remove secure file	
-	purge $AESPASSWORD
-	
 	echo "> Encrypt $fileName : done"
 	echo "> Output directory : $lOUTPUTDIR"	
 }
@@ -105,6 +102,10 @@ encryptFolder(){
 			encryptFolder "${file}" "$result"
 		fi
 	done
+
+	# Remove secure file	
+	purge $AESPASSWORD
+	purge $RSAKEY_PASSWORD_FILE
 }
 
 #
@@ -123,8 +124,6 @@ encryptFolderName(){
 	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
 	folderExist "$lOUTPUTDIR"
 
-	#echo "> encrypt folder $folderName : start"
-	
 	# Get AES KEY	
 	extractkey
 
@@ -141,9 +140,6 @@ encryptFolderName(){
 		mkdir $OUTPUT_FOLDERNAME
 	fi
 
-	# Remove secure file	
-	purge $AESPASSWORD
-	
 	#echo "> encrypt folder $folderName : done"
 	echo "$BASE64_SAFE"
 }
@@ -187,8 +183,6 @@ decryptFile()
 	fileExist "$file"
 	folderExist "$lOUTPUTDIR"
 
-	echo "> Decrypt $fileName : start"
-	
 	# Get AES KEY	
 	extractkey
 
@@ -202,9 +196,6 @@ decryptFile()
 	# Decrypt file
 	openssl enc -d -aes-256-cbc -in "$file" -out "$lOUTPUTDIR$OUTPUT_FILENAME" -pass file:$AESPASSWORD
 
-	# Remove secure file	
-	purge $AESPASSWORD
-	
 	echo "> Decrypt $fileName : done"
 	echo "> Output directory : $lOUTPUTDIR"		
 }
@@ -270,6 +261,10 @@ decryptFolder(){
 			decryptFolder "${file}" "$result"
 		fi
 	done
+
+	# Remove secure file	
+	purge $AESPASSWORD
+	purge $RSAKEY_PASSWORD_FILE
 }
 
 #
@@ -288,8 +283,6 @@ decryptFolderName(){
 	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
 	folderExist "$lOUTPUTDIR"
 
-	#echo "> decrypt folder $folderName : start"
-	
 	# Get AES KEY	
 	extractkey
 
@@ -308,9 +301,6 @@ decryptFolderName(){
 		mkdir "$OUTPUT_FOLDERNAME"
 	fi
 
-	# Remove secure file	
-	purge $AESPASSWORD
-	
 	#echo "> decrypt folder $folderName : done"
 	echo "$DECRYPTED_FOLDERNAME"
 }
@@ -336,6 +326,7 @@ decryptfromString()
 
 	# Remove secure file	
 	purge $AESPASSWORD
+	purge $RSAKEY_PASSWORD_FILE
 
 	echo "> Decrypt : $OUTPUT_FILENAME"
 }
@@ -343,7 +334,7 @@ decryptfromString()
 genkey()
 {
 	local RSAKEY_PREFIX=data
-	local RSAKEY_PASSWORD=dummypassword
+	local lRSAKEY_PASSWORD="dummypassword"
 	local lRSA_PRIV_KEY=$WORKSPACE$RSAKEY_PREFIX"_PRIV.pem"
 	local lRSA_PUB_KEY=$WORKSPACE$RSAKEY_PREFIX"_PUB.pem"
 	local lAESPASSWORD_enc=$AESPASSWORD".enc"
@@ -355,9 +346,13 @@ genkey()
 	if [ -f "$file" ]
 	then
 		echo "WARNING ! $file already found."
+		exit 1
 	else
 		echo "Generating key request for $lRSA_PRIV_KEY"
-		openssl genrsa -passout pass:$RSAKEY_PASSWORD -out $lRSA_PRIV_KEY 4096 -noout
+
+		read -p "> Your password ? " lRSAKEY_PASSWORD
+		echo $lRSAKEY_PASSWORD > $RSAKEY_PASSWORD_FILE
+		openssl genrsa -aes256 -passout file:$RSAKEY_PASSWORD_FILE -out $lRSA_PRIV_KEY 4096 -noout
 	fi
 
 	# Generate random AES Password
@@ -365,6 +360,7 @@ genkey()
 	if [ -f "$file" ]
 	then
 		echo "WARNING ! $file already found."
+		exit 1		
 		exit
 	else
 		echo "Generate a 256 bit (32 byte) random key"
@@ -375,7 +371,7 @@ genkey()
 	file=$lRSA_PUB_KEY
 	if [ ! -f "$file" ]
 	then
-		openssl rsa -pubout -in $lRSA_PRIV_KEY -out $lRSA_PUB_KEY
+		openssl rsa -passin file:$RSAKEY_PASSWORD_FILE -pubout -in $lRSA_PRIV_KEY -out $lRSA_PUB_KEY
 	fi
 
 	# Encrypt AES Password
@@ -383,14 +379,15 @@ genkey()
 	if [ -f "$file" ]
 	then
 		echo "WARNING ! $file already found."
-		exit
+		exit 1
 	else
-		openssl rsautl -encrypt -inkey $lRSA_PUB_KEY -pubin -in $AESPASSWORD -out $lAESPASSWORD_enc
+		openssl rsautl -passin file:$RSAKEY_PASSWORD_FILE -encrypt -inkey $lRSA_PUB_KEY -pubin -in $AESPASSWORD -out $lAESPASSWORD_enc
 	fi
 
 	# Remove secure file
 	purge $AESPASSWORD
-	
+	purge $RSAKEY_PASSWORD_FILE
+
 	echo "> GENKEY : DONE"
 }
 
@@ -420,24 +417,11 @@ menu()
 		esac
 	done
 
+	# Remove secure file
+	purge $AESPASSWORD
+	purge $RSAKEY_PASSWORD_FILE
+
 	exit
-}
-
-menuconsole()
-{
-	while getopts ":a:p:" opt; do
-	  case $opt in
-		a) arg_1="$OPTARG"
-		;;
-		p) p_out="$OPTARG"
-		;;
-		\?) echo "Invalid option -$OPTARG" >&2
-		;;
-	  esac
-	done
-
-	printf "Argument p_out is %s\n" "$p_out"
-	printf "Argument arg_1 is %s\n" "$arg_1"
 }
 
 # 1 : $TARGET 
@@ -510,24 +494,38 @@ checkfolder()
 extractkey()
 {
 	# Get AES KEY	
-	local file=$AESPASSWORD
+	local file=""
+	local lRSAKEY_PASSWORD=""
+
+    file=$RSAKEY_PASSWORD_FILE
 	if [ ! -f "$file" ]
 	then
-		openssl rsautl -decrypt -inkey "$RSA_KEY" -in "$ASEPASS" -out "$file"
+		read -p "> Your password ? " lRSAKEY_PASSWORD
+		echo $lRSAKEY_PASSWORD > $RSAKEY_PASSWORD_FILE
+	fi	
+
+	file=$AESPASSWORD
+	if [ ! -f "$file" ]
+	then
+		openssl rsautl -passin file:$RSAKEY_PASSWORD_FILE -decrypt -inkey "$RSA_KEY" -in "$ASEPASS" -out "$file"
 	fi
+
 }
 
 purge()
 {
-	local lAESPASSWORD=$1
-	rm $lAESPASSWORD
+	local lfile=$1
+	
+	if [ -f "$lfile" ]
+	then
+		rm $lfile
+	fi
 }
 
 ######
 # Main method
 ######
 main() {
-	#menuconsole
 	menu	
 	#encryptAES
 	#decryptAES
