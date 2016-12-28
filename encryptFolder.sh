@@ -2,27 +2,25 @@
 
 declare -r RSA_KEY="$1"
 declare -r ASEPASS="$2"
-declare -r FILETARGET="$3"
+declare -r TARGET="$3"
 declare -r WORKSPACE='E:\temp\OpenSSH\'
 declare -r AESPASSWORD=$WORKSPACE"key.bin"
-declare -r OUTPUTDIR='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\'
+declare -r OUTPUTDIR='C:\Users\Windows-Work\Documents\Projects\ssl\TESTING\OUTPUT\'
 # declare -r CURRENT=$PWD
 
 encryptAES()
 {
-	# If exist
-	checkfile "$FILETARGET" "$ASEPASS" "$RSA_KEY"
-
-	result=$(checkfolder "$FILETARGET")
+	result=$(checkfolder "$TARGET")
 	#echo $result
 
 	if [[ $result = "0" ]]
 	then
-		echo "ENCRYPT a directory"
+		#echo "ENCRYPT a directory"
+		encryptFolder "$TARGET"
 	elif [[ $result = "1" ]]
 	then
-		echo "ENCRYPT a file"
-		encryptFile "$FILETARGET"
+		#echo "ENCRYPT a file"
+		encryptFile "$TARGET"
 	else
 		echo "ERROR - $result is not valid"
 		exit 1
@@ -32,63 +30,126 @@ exit 1
 }
 
 #####
-# Ecnrypt $1 file
+# Encrypt $1 file
+# $2 outputDIR
 #####
 encryptFile(){
-	local file=$(basename "$1")
+	local file="$1"
+	local fileName=$(basename "$1")
+	local lOUTPUTDIR=$OUTPUTDIR
+
+	if [ -n "$2" ]
+	then
+		lOUTPUTDIR=$OUTPUTDIR$2'\'
+	fi
 
     # If exist
-	checkfile "$file" "$ASEPASS" "$RSA_KEY"
+	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
+	fileExist "$file"
+	folderExist "$lOUTPUTDIR"
 
-	echo "> ENCRYPT : START"
+	echo "> Encrypt $fileName : start"
 	
 	# Get AES KEY	
 	extractkey
 
-	#filename=$(basename "$file")
-	#echo $filename
-	#extension="${filename##*.}"
-	#echo $extension
-	#filename="${filename%.*}"
-	#echo $filename
-
 	# Encrypt File name
-	local ENCRYPTED_FILENAME=`echo $file | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+	local ENCRYPTED_FILENAME=`echo $fileName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
 
 	# Create filename with SHA256
-	local ENCRYPTED_FILENAME_SHA256=`echo $ENCRYPTED_FILENAME | openssl dgst -sha256`
-	ENCRYPTED_FILENAME_SHA256=${ENCRYPTED_FILENAME_SHA256#*= }
+#	local ENCRYPTED_FILENAME_SHA256=`echo $ENCRYPTED_FILENAME | openssl dgst -sha256`
+#	ENCRYPTED_FILENAME_SHA256=${ENCRYPTED_FILENAME_SHA256#*= }
 
 	# Create Manifest file
-	local FILE_MANIFEST=$OUTPUTDIR$ENCRYPTED_FILENAME_SHA256".manifest"
+#	local FILE_MANIFEST=$lOUTPUTDIR$ENCRYPTED_FILENAME".manifest"
 	
-	touch $FILE_MANIFEST
+#	touch $FILE_MANIFEST
+#	echo $ENCRYPTED_FILENAME_SHA256 > $FILE_MANIFEST
 
 	# Inject encrypted base64 filename
-	`echo $file | openssl enc -base64 -e -aes-256-cbc -nosalt -out $FILE_MANIFEST -pass file:$AESPASSWORD`
+#	`echo $file | openssl enc -base64 -e -aes-256-cbc -nosalt -out $FILE_MANIFEST -pass file:$AESPASSWORD`
 
-	echo .
-	echo "$FILE_MANIFEST"
-	echo .
+#	echo .
+#	echo "$FILE_MANIFEST"
+#	echo .
 	
 	# Convert base64 to base64 safe
 	local BASE64_SAFE=`echo "$ENCRYPTED_FILENAME" | tr \/ _`
-	local OUTPUT_FILENAME=$BASE64_SAFE
+	local OUTPUT_FILENAME=$lOUTPUTDIR$BASE64_SAFE
 	
-
 	# Encrypt 
-	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUTDIR$OUTPUT_FILENAME" -pass file:$AESPASSWORD
+	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
 
 	# Remove secure file	
 	purge $AESPASSWORD
 	
-	echo "> ENCRYPT : DONE"	
+	echo "> Encrypt $fileName : done"
+	echo "> Output directory : $lOUTPUTDIR"	
+}
+
+encryptFolder(){
+	for file in "$1"/*
+	do
+		if [ ! -d "${file}" ]
+		then
+			#echo "${file} is a file"
+			#local folderName=$(basename "$1")
+			encryptFile "${file}" "$2"
+		else
+			#echo "${file}"
+			local folderName=$(basename "${file}")
+			#echo $folderName
+			local result=$(encryptFolderName "$folderName")
+			encryptFolder "${file}" "$result"
+		fi
+	done
+}
+
+#
+# Encrypt and Create folder
+#
+encryptFolderName(){
+	local folderName="$1"
+	local lOUTPUTDIR="$OUTPUTDIR"
+	
+	if [ -n "$2" ]
+	then
+		lOUTPUTDIR=$OUTPUTDIR$2'\'
+	fi
+
+    # If exist
+	checkOpenSSLfile "$ASEPASS" "$RSA_KEY"
+	folderExist "$lOUTPUTDIR"
+
+	#echo "> encrypt folder $folderName : start"
+	
+	# Get AES KEY	
+	extractkey
+
+	# Encrypt File name
+	local ENCRYPTED_FOLDERNAME=`echo $folderName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$AESPASSWORD`
+	
+	# Convert base64 to base64 safe
+	local BASE64_SAFE=`echo "$ENCRYPTED_FOLDERNAME" | tr \/ _`
+	local OUTPUT_FOLDERNAME=$lOUTPUTDIR$BASE64_SAFE
+	
+	# Check if output folder already exist
+	if [ ! -d "$OUTPUT_FOLDERNAME" ]
+	then
+		mkdir $OUTPUT_FOLDERNAME
+	fi
+
+	# Remove secure file	
+	purge $AESPASSWORD
+	
+	#echo "> encrypt folder $folderName : done"
+	echo "$BASE64_SAFE"
 }
 
 decrypt()
 {
 	# If exist
-	checkfile $FILETARGET $ASEPASS $RSA_KEY
+	checkfile $TARGET $ASEPASS $RSA_KEY
 	
 	echo "> DECRYPT : START"
 	
@@ -96,13 +157,13 @@ decrypt()
 	extractkey
 	
 	# Convert base64 safe to real base64
-	local BASE64_SAFE=`echo "$FILETARGET" | tr _ \/`
+	local BASE64_SAFE=`echo "$TARGET" | tr _ \/`
 	local OUTPUT_FILENAME=$BASE64_SAFE
 
 	# Decrypt filename
 	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$WORKSPACE"key.bin"`
 	# Decrypt file
-	openssl enc -d -aes-256-cbc -in "./$FILETARGET" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
+	openssl enc -d -aes-256-cbc -in "./$TARGET" -out "$OUTPUT_FILENAME" -pass file:$AESPASSWORD
 
 	# Remove secure file
 	purge $AESPASSWORD
@@ -209,26 +270,21 @@ menuconsole()
 	printf "Argument arg_1 is %s\n" "$arg_1"
 }
 
-# 1 : $FILETARGET 
+# 1 : $TARGET 
 # 2 : $ASEPASS 
 # 3 : $RSA_KEY
-checkfile()
+# 4 : OUTPUTFOLDER
+checkOpenSSLfile()
 {
 	local file="$1"
+
 	if [ ! -f "$file" ]
 	then
 		echo "$file not found."
 		exit 1
 	fi
 	
-	file=$2
-	if [ ! -f "$file" ]
-	then
-		echo "$file not found."
-		exit 1
-	fi
-	
-	file=$3
+	file="$2"
 	if [ ! -f "$file" ]
 	then
 		echo "$file not found."
@@ -236,8 +292,32 @@ checkfile()
 	fi
 }
 
+fileExist()
+{
+	local file="$1"
+	if [ ! -f "$file" ]
+	then
+		echo "file $file not found."
+		exit 1
+	fi
+}
+
+
+folderExist()
+{
+	local file="$1"
+	if [ ! -d "$file" ]
+	then
+		echo "$file not found."
+		exit 1
+	fi
+}
+
+#
+# Return value
 # 0 = FOLDER
 # 1 = FILE
+#
 checkfolder()
 {
 	local file="$1"
@@ -245,11 +325,9 @@ checkfolder()
 
 	if [[ -d "$file" ]]
 	then
-	#	echo "$file is a directory"
 		myresult=0
 	elif [[ -f "$file" ]]
 	then
-	#	echo "$file is a file"
 		myresult=1
 	else
 		echo "ERROR - $file is not valid"
