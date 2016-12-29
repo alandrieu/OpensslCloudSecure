@@ -342,7 +342,36 @@ decryptfromString()
 	purge $FILE_AES_PASSWORD_DECRYPTED
 	purge $FILE_RSA_PRIV_KEY_PASSWORD
 
-	echo "> Decrypt : $OUTPUT_FILENAME"
+	echo "> Decrypt : [$OUTPUT_FILENAME]"
+}
+
+# 
+# Encrypt file or folder name
+#
+encryptfromString()
+{
+	local fileName=""
+
+	read -p "> Your file or folder name ? " fileName
+	
+    # If exist
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
+
+	# Get AES KEY	
+	extractkey
+
+	# Encrypt File name
+	local ENCRYPTED_STRING=`echo $fileName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	checkError $?	
+
+	# Convert base64 to base64 safe
+	local BASE64_SAFE=`echo "$ENCRYPTED_STRING" | tr \/ _`
+
+	# Remove secure file	
+	purge $FILE_AES_PASSWORD_DECRYPTED
+	purge $FILE_RSA_PRIV_KEY_PASSWORD
+
+	echo "> Encrypt : [$BASE64_SAFE]"
 }
 
 # 
@@ -421,7 +450,7 @@ genkey()
 menu()
 {
 	PS3='Please enter your choice: '
-	options=("encrypt" "decrypt" "genkey" "decryptString" "Quit")
+	options=("encrypt" "decrypt" "genkey" "decryptString" "encryptString" "Quit")
 	select opt in "${options[@]}"
 	do
 		case $opt in
@@ -436,7 +465,10 @@ menu()
 				;;
 			"decryptString")
 				decryptfromString
-				;;				
+				;;
+			"encryptString")
+				encryptfromString
+				;;								
 			"Quit")
 				break
 				;;
