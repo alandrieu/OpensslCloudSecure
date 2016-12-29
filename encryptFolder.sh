@@ -384,9 +384,8 @@ genkey()
 		exit 1		
 		exit
 	else
-		echo "Generate a 256 bit (32 byte) random key"
-		# openssl rand -base64 256 > "$FILE_AES_PASSWORD_DECRYPTED"
-		openssl rand 256 > "$FILE_AES_PASSWORD_DECRYPTED"
+		echo "Generate a 2048 bit (256 byte) random key"
+		openssl rand -out "$FILE_AES_PASSWORD_DECRYPTED" 256
 		checkError $?
 	fi
 
