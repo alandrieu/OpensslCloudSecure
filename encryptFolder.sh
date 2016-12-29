@@ -17,7 +17,7 @@ declare -r TARGET="$3"
 declare -r FILE_RSA_PRIV_KEY="$1"
 declare -r FILE_RSA_PRIV_KEY_PASSWORD=$(windowsPathConverter "$FOLDER_WORKSPACE""_test.lock")
 declare -r FILE_AES_PASSWORD_ENCRYPTED="$2"
-declare -r FILE_AES_PASSWORD_DECRYPTED=$(windowsPathConverter "$FOLDER_WORKSPACE"".bin")
+declare -r FILE_AES_PASSWORD_DECRYPTED=$(windowsPathConverter "$FOLDER_WORKSPACE""key.bin")
 declare -r FOLDER_OUTPUT_ENCRYPTED_DATA=$PWD"/OUTPUT/"
 declare -r FOLDER_OUTPUT_DECRYPTED_DATA=$PWD"/OUTPUT_CLEAR/"
 
@@ -357,8 +357,9 @@ genkey()
 	local lAESPASSWORD_enc=$FILE_AES_PASSWORD_DECRYPTED".enc"
 
 	# Get RSA_PRIV_KEY_PASSWORD
-	read -p "> Your password ? " lRSAKEY_PASSWORD
+	read -s -p "> Your private password: " lRSAKEY_PASSWORD
 	echo $lRSAKEY_PASSWORD > $FILE_RSA_PRIV_KEY_PASSWORD
+	echo .
 	echo $FILE_RSA_PRIV_KEY_PASSWORD
 
 	echo "> GENKEY : START"
@@ -370,10 +371,7 @@ genkey()
 		echo "WARNING ! $file already found."
 		exit 1
 	else
-		echo "Generating 
-		
-		
-		 $lRSA_PRIV_KEY"
+		echo "Generating $lRSA_PRIV_KEY"
 		openssl genrsa -aes256 -passout file:"$FILE_RSA_PRIV_KEY_PASSWORD" -out "$lRSA_PRIV_KEY" 4096 -noout
 		checkError $?		
 	fi
@@ -387,7 +385,8 @@ genkey()
 		exit
 	else
 		echo "Generate a 256 bit (32 byte) random key"
-		openssl rand -base64 32 > $FILE_AES_PASSWORD_DECRYPTED
+		# openssl rand -base64 256 > "$FILE_AES_PASSWORD_DECRYPTED"
+		openssl rand 256 > "$FILE_AES_PASSWORD_DECRYPTED"
 		checkError $?
 	fi
 
@@ -538,7 +537,7 @@ extractkey()
     file=$FILE_RSA_PRIV_KEY_PASSWORD
 	if [ ! -f "$file" ]
 	then
-		read -p "> Your password ? " lRSAKEY_PASSWORD
+		read -s -p "> Your private password: " lRSAKEY_PASSWORD
 		echo $lRSAKEY_PASSWORD > $FILE_RSA_PRIV_KEY_PASSWORD
 	fi	
 
@@ -548,7 +547,6 @@ extractkey()
 		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -decrypt -inkey "$FILE_RSA_PRIV_KEY" -in "$FILE_AES_PASSWORD_ENCRYPTED" -out "$file"
 		checkError $?
 	fi
-
 }
 
 checkError()
