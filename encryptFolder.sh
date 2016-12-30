@@ -1,39 +1,47 @@
 #!/bin/bash
 
-# Convert path for OpenSSL
+#
+# Convert path for OpenSSL on CigWin
+#
 windowsPathConverter()
 {
 	if [[ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" || "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]]; then
 		# Do something under Windows NT platform
-		local lCONVERT=$(cygpath -p -w "$1")
-		echo $lCONVERT
+		local lCONVERT;
+		lCONVERT=$(cygpath -p -w "$1");
+		echo "$lCONVERT";
 	else 
-		echo $1
+		echo "$1";
 	fi
 }
 
-declare -r FOLDER_WORKSPACE="/e/temp/OpenSSH/"
-declare -r TARGET="$3"
-declare -r FILE_RSA_PRIV_KEY="$1"
-declare -r FILE_RSA_PRIV_KEY_PASSWORD=$(windowsPathConverter "$FOLDER_WORKSPACE""_test.lock")
-declare -r FILE_AES_PASSWORD_ENCRYPTED="$2"
-declare -r FILE_AES_PASSWORD_DECRYPTED=$(windowsPathConverter "$FOLDER_WORKSPACE""key.bin")
-declare -r FOLDER_OUTPUT_ENCRYPTED_DATA=$PWD"/OUTPUT/"
-declare -r FOLDER_OUTPUT_DECRYPTED_DATA=$PWD"/OUTPUT_CLEAR/"
+declare -r FOLDER_WORKSPACE="/e/temp/OpenSSH/";
+declare -r TARGET="$3";
+declare -r FILE_RSA_PRIV_KEY="$1";
+declare temp_FILE_RSA_PRIV_KEY_PASSWORD;
+temp_FILE_RSA_PRIV_KEY_PASSWORD=$(windowsPathConverter "$FOLDER_WORKSPACE""_test.lock");
+declare -r FILE_RSA_PRIV_KEY_PASSWORD=$temp_FILE_RSA_PRIV_KEY_PASSWORD;
+declare -r FILE_AES_PASSWORD_ENCRYPTED="$2";
+declare temp_FILE_AES_PASSWORD_DECRYPTED;
+temp_FILE_AES_PASSWORD_DECRYPTED=$(windowsPathConverter "$FOLDER_WORKSPACE""key.bin");
+declare -r FILE_AES_PASSWORD_DECRYPTED=$temp_FILE_AES_PASSWORD_DECRYPTED;
+declare -r FOLDER_OUTPUT_ENCRYPTED_DATA=$PWD"/OUTPUT/";
+declare -r FOLDER_OUTPUT_DECRYPTED_DATA=$PWD"/OUTPUT_CLEAR/";
 
 encryptAES()
 {
-	result=$(checkfolder "$TARGET")
+	local lResult;
+	lResult=$(checkfolder "$TARGET");
 
-	if [[ $result = "0" ]]
+	if [[ $lResult = "0" ]]
 	then
-		encryptFolder "$TARGET"
-	elif [[ $result = "1" ]]
+		encryptFolder "$TARGET";
+	elif [[ $lResult = "1" ]]
 	then
-		encryptFile "$TARGET"
+		encryptFile "$TARGET";
 	else
-		echo "ERROR - $result is not valid"
-		exit 1
+		echo "ERROR - $lResult is not valid";
+		exit 1;
 	fi
 }
 
@@ -42,9 +50,10 @@ encryptAES()
 # [optional] add $2 like aditionnal folder
 #
 encryptFile(){
-	local file="$1"
-	local fileName=$(basename "$1")
-	local lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA
+	local file="$1";
+	local fileName;
+	fileName=$(basename "$1");
+	local lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA;
 
 	if [ -n "$2" ]
 	then
@@ -52,29 +61,31 @@ encryptFile(){
 	fi
 
     # If exist
-	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
-	fileExist "$file"
-	folderExist "$lOUTPUTDIR"
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
+	fileExist "$file";
+	folderExist "$lOUTPUTDIR";
 
 	# Get AES KEY	
 	extractkey
 
 	# Encrypt File name
-	local ENCRYPTED_FILENAME=`echo $fileName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	local ENCRYPTED_FILENAME;
+	ENCRYPTED_FILENAME=$(echo "$fileName" | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?
 	
 	# Convert base64 to base64 safe
-	local BASE64_SAFE=`echo "$ENCRYPTED_FILENAME" | tr \/ _`
-	local OUTPUT_FILENAME=$lOUTPUTDIR$BASE64_SAFE
-	local OUTPUT_FILENAME_SING=$lOUTPUTDIR$BASE64_SAFE".sha256"
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$ENCRYPTED_FILENAME" | tr '/' _);
+	local OUTPUT_FILENAME=$lOUTPUTDIR$BASE64_SAFE;
+	local OUTPUT_FILENAME_SING=$lOUTPUTDIR$BASE64_SAFE".sha256";
 	
 	# Encrypt 
-	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUT_FILENAME" -pass file:$FILE_AES_PASSWORD_DECRYPTED
+	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUT_FILENAME" -pass file:"$FILE_AES_PASSWORD_DECRYPTED"
 	checkError $?
 
 	# Generate signature
-	local lRSA_PRIV_KEY=$FOLDER_WORKSPACE"data_PRIV.pem"
-	local lRSA_PUB_KEY=$FOLDER_WORKSPACE"data_PUB.pem"
+	local lRSA_PRIV_KEY=$FOLDER_WORKSPACE"data_PRIV.pem";
+	local lRSA_PUB_KEY=$FOLDER_WORKSPACE"data_PUB.pem";
 	openssl dgst -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -sha256 -sign "$lRSA_PRIV_KEY" -out "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
 	checkError $?
 
@@ -82,15 +93,15 @@ encryptFile(){
 	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$OUTPUT_FILENAME"
 	checkError $?
 
-	echo "> Encrypt $fileName : done"
-	echo "> Output directory : $lOUTPUTDIR"	
+	echo "> Encrypt $fileName : done";
+	echo "> Output directory : $lOUTPUTDIR";
 }
 
 #
 # Recursive folder parsing
 #
 encryptFolder(){
-	local folderFullPath=""
+	local folderFullPath="";
 
 	for file in "$1"/*
 	do
@@ -99,36 +110,38 @@ encryptFolder(){
 		echo .
 			encryptFile "${file}" "$2"
 		else
-			local folderName=$(basename "${file}")
+			local folderName;
+			folderName=$(basename "${file}");
 	
 			if [ -n "$folderFullPath" ]
 			then
-				folderFullPath="$folderFullPath/$2"
+				folderFullPath="$folderFullPath/$2";
 			else
-				folderFullPath=$folderFullPath$2
+				folderFullPath=$folderFullPath$2;
 			fi
 
-			local result=$(encryptFolderName "$folderName" "$folderFullPath")
-			result="$folderFullPath/$result"
-			encryptFolder "${file}" "$result"
+			local result;
+			result=$(encryptFolderName "$folderName" "$folderFullPath");
+			result="$folderFullPath/$result";
+			encryptFolder "${file}" "$result";
 		fi
 	done
 
-	# Remove secure file	
-	purge $FILE_AES_PASSWORD_DECRYPTED
-	purge $FILE_RSA_PRIV_KEY_PASSWORD
+	# Remove secure file
+	autoPurge
+
 }
 
 #
 # Encrypt folder name and create folder with encrypted folder name
 #
 encryptFolderName(){
-	local folderName="$1"
-	local lOUTPUTDIR="$FOLDER_OUTPUT_ENCRYPTED_DATA"
+	local folderName="$1";
+	local lOUTPUTDIR="$FOLDER_OUTPUT_ENCRYPTED_DATA";
 	
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2"/"
+		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2"/";
 	fi
 
     # If exist
@@ -139,36 +152,39 @@ encryptFolderName(){
 	extractkey
 
 	# Encrypt File name
-	local ENCRYPTED_FOLDERNAME=`echo $folderName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	local ENCRYPTED_FOLDERNAME;
+	ENCRYPTED_FOLDERNAME=$(echo "$folderName" | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?	
 
 	# Convert base64 to base64 safe
-	local BASE64_SAFE=`echo "$ENCRYPTED_FOLDERNAME" | tr \/ _`
-	local OUTPUT_FOLDERNAME=$lOUTPUTDIR$BASE64_SAFE
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$ENCRYPTED_FOLDERNAME" | tr '/' _);
+	local OUTPUT_FOLDERNAME=$lOUTPUTDIR$BASE64_SAFE;
 	
 	# Check if output folder already exist
 	if [ ! -d "$OUTPUT_FOLDERNAME" ]
 	then
-		mkdir $OUTPUT_FOLDERNAME
+		mkdir "$OUTPUT_FOLDERNAME";
 	fi
 
 	#echo "> encrypt folder $folderName : done"
-	echo "$BASE64_SAFE"
+	echo "$BASE64_SAFE";
 }
 
 decryptAES()
 {
-	result=$(checkfolder "$TARGET")
+	local result;
+	result=$(checkfolder "$TARGET");
 	
 	if [[ $result = "0" ]]
 	then
-		decryptFolder "$TARGET"
+		decryptFolder "$TARGET";
 	elif [[ $result = "1" ]]
 	then
-		decryptFile "$TARGET"
+		decryptFile "$TARGET";
 	else
-		echo "ERROR - $result is not valid"
-		exit 1
+		echo "ERROR - $result is not valid";
+		exit 1;
 	fi
 }
 
@@ -178,37 +194,39 @@ decryptAES()
 # 
 decryptFile()
 {
-	local file="$1"
-	local fileName=$(basename "$1")
-	local lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA
+	local file="$1";
+	local fileName;
+	fileName=$(basename "$1");
+	local lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA;
 
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA$2"/"
+		lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA$2"/";
 	fi
 
     # If exist
-	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
-	fileExist "$file"
-	folderExist "$lOUTPUTDIR"
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
+	fileExist "$file";
+	folderExist "$lOUTPUTDIR";
 
 	# Get AES KEY	
 	extractkey
 
 	# Convert base64 safe to real base64
-	local BASE64_SAFE=`echo "$fileName" | tr _ \/`
-	local OUTPUT_FILENAME=$BASE64_SAFE
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$fileName" | tr _ '/');
+	local OUTPUT_FILENAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?
 
 	# Decrypt file
-	openssl enc -d -aes-256-cbc -in "$file" -out "$lOUTPUTDIR$OUTPUT_FILENAME" -pass file:$FILE_AES_PASSWORD_DECRYPTED
+	openssl enc -d -aes-256-cbc -in "$file" -out "$lOUTPUTDIR$OUTPUT_FILENAME" -pass file:"$FILE_AES_PASSWORD_DECRYPTED"
 	checkError $?
 
-	echo "> Decrypt $fileName : done"
-	echo "> Output directory : $lOUTPUTDIR"		
+	echo "> Decrypt $fileName : done";
+	echo "> Output directory : $lOUTPUTDIR";
 }
 
 #
@@ -216,103 +234,106 @@ decryptFile()
 #
 chekcSingFile()
 {
-	local file="$1"
-	file="${file%.*}"
+	local file="$1";
+	file="${file%.*}";
 	
     # If exist
-	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
-	fileExist "$file"
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
+	fileExist "$file";
 
-	echo "> Check signature $fileName : start"
+	echo "> Check signature $fileName : start";
 	
 	# Generate signature
-	local lRSA_PUB_KEY=$FOLDER_WORKSPACE"data_PUB.pem"
-	local OUTPUT_FILENAME_SING=$file".sha256"	
+	local lRSA_PUB_KEY=$FOLDER_WORKSPACE"data_PUB.pem";
+	local OUTPUT_FILENAME_SING=$file".sha256";	
 
 	# Check signature
 	openssl dgst -sha256 -verify "$lRSA_PUB_KEY" -signature "$OUTPUT_FILENAME_SING" "$file"
 	checkError $?
 
-	echo "> Check signature $fileName : done"	
+	echo "> Check signature $fileName : done";
 }
 
 #
 # Recursive folder parsing for decrypt
 #
 decryptFolder(){
-	local folderFullPath=""
+	local folderFullPath="";
 
 	for file in "$1"/*
 	do
 		if [ ! -d "${file}" ]
 		then
-			local filename=$(basename "${file}")
-			local extension="${filename##*.}"
+			local filename;
+			filename=$(basename "${file}");
+			local extension="${filename##*.}";
 
 			if [[ "$extension" = "sha256" ]]
 			then
-				chekcSingFile "${file}"
+				chekcSingFile "${file}";
 			else
-				decryptFile "${file}" "$2"
+				decryptFile "${file}" "$2";
 			fi
 		else
-			local folderName=$(basename "${file}")
+			local folderName;
+			folderName=$(basename "${file}");
 	
 			if [ -n "$folderFullPath" ]
 			then
-				folderFullPath="$folderFullPath/$2"
+				folderFullPath="$folderFullPath/$2";
 			else
-				folderFullPath=$folderFullPath$2
+				folderFullPath=$folderFullPath$2;
 			fi
 
-			local result=$(decryptFolderName "$folderName" "$folderFullPath")
-			result="$folderFullPath/$result"
-			decryptFolder "${file}" "$result"
+			local result;
+			result=$(decryptFolderName "$folderName" "$folderFullPath");
+			result="$folderFullPath/$result";
+			decryptFolder "${file}" "$result";
 		fi
 	done
 
-	# Remove secure file	
-	purge $FILE_AES_PASSWORD_DECRYPTED
-	purge $FILE_RSA_PRIV_KEY_PASSWORD
+	# Remove secure file
+	autoPurge
 }
 
 #
 # Decrypt folder name and create folder with clear folder name
 #
 decryptFolderName(){
-	local folderName="$1"
-	local lOUTPUTDIR="$FOLDER_OUTPUT_DECRYPTED_DATA"
+	local folderName="$1";
+	local lOUTPUTDIR="$FOLDER_OUTPUT_DECRYPTED_DATA";
 	
 	if [ -n "$2" ]
 	then
-		lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA$2"/"
+		lOUTPUTDIR=$FOLDER_OUTPUT_DECRYPTED_DATA$2"/";
 	fi
 
     # If exist
-	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
-	folderExist "$lOUTPUTDIR"
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
+	folderExist "$lOUTPUTDIR";
 
 	# Get AES KEY	
 	extractkey
 
 	# Convert base64 safe to real base64
-	local BASE64_SAFE=`echo "$folderName" | tr _ \/`
-	local OUTPUT_FOLDERNAME=$BASE64_SAFE
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$folderName" | tr _ '/');
+	local OUTPUT_FOLDERNAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	DECRYPTED_FOLDERNAME=`echo $OUTPUT_FOLDERNAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	DECRYPTED_FOLDERNAME=$(echo "$OUTPUT_FOLDERNAME" | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?
 
-	local OUTPUT_FOLDERNAME="$lOUTPUTDIR$DECRYPTED_FOLDERNAME"
+	local OUTPUT_FOLDERNAME="$lOUTPUTDIR$DECRYPTED_FOLDERNAME";
 	
 	# Check if output folder already exist
 	if [ ! -d "$OUTPUT_FOLDERNAME" ]
 	then
-		mkdir "$OUTPUT_FOLDERNAME"
+		mkdir "$OUTPUT_FOLDERNAME";
 	fi
 
 	#echo "> decrypt folder $folderName : done"
-	echo "$DECRYPTED_FOLDERNAME"
+	echo "$DECRYPTED_FOLDERNAME";
 }
 
 # 
@@ -320,29 +341,29 @@ decryptFolderName(){
 #
 decryptfromString()
 {
-	local fileName=""
+	local fileName="";
 
-	read -p "> Your file or folder name ? " fileName
+	read -r -p "> Your file or folder name ? " fileName;
 	
     # If exist
-	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
 
 	# Get AES KEY	
 	extractkey
 
 	# Convert base64 safe to real base64
-	local BASE64_SAFE=`echo "$fileName" | tr _ \/`
-	local OUTPUT_FILENAME=$BASE64_SAFE
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$fileName" | tr _ '/');
+	local OUTPUT_FILENAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	OUTPUT_FILENAME=`echo $OUTPUT_FILENAME | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?
 
-	# Remove secure file	
-	purge $FILE_AES_PASSWORD_DECRYPTED
-	purge $FILE_RSA_PRIV_KEY_PASSWORD
+	# Remove secure file
+	autoPurge
 
-	echo "> Decrypt : [$OUTPUT_FILENAME]"
+	echo "> Decrypt : [$OUTPUT_FILENAME]";
 }
 
 # 
@@ -350,28 +371,29 @@ decryptfromString()
 #
 encryptfromString()
 {
-	local fileName=""
+	local fileName="";
 
-	read -p "> Your file or folder name ? " fileName
+	read -r -p "> Your file or folder name ? " fileName;
 	
     # If exist
-	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY"
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
 
 	# Get AES KEY	
 	extractkey
 
 	# Encrypt File name
-	local ENCRYPTED_STRING=`echo $fileName | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:$FILE_AES_PASSWORD_DECRYPTED`
+	local ENCRYPTED_STRING;
+	ENCRYPTED_STRING=$(echo "$fileName" | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?	
 
 	# Convert base64 to base64 safe
-	local BASE64_SAFE=`echo "$ENCRYPTED_STRING" | tr \/ _`
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$ENCRYPTED_STRING" | tr '/' _);
 
-	# Remove secure file	
-	purge $FILE_AES_PASSWORD_DECRYPTED
-	purge $FILE_RSA_PRIV_KEY_PASSWORD
+	# Remove secure file
+	autoPurge
 
-	echo "> Encrypt : [$BASE64_SAFE]"
+	echo "> Encrypt : [$BASE64_SAFE]";
 }
 
 # 
@@ -379,17 +401,15 @@ encryptfromString()
 #
 genkey()
 {
-	local RSAKEY_PREFIX=data
-	local lRSAKEY_PASSWORD="dummypassword"
-	local lRSA_PRIV_KEY=$FOLDER_WORKSPACE$RSAKEY_PREFIX"_PRIV.pem"
-	local lRSA_PUB_KEY=$FOLDER_WORKSPACE$RSAKEY_PREFIX"_PUB.pem"
-	local lAESPASSWORD_enc=$FILE_AES_PASSWORD_DECRYPTED".enc"
+	local RSAKEY_PREFIX=data;
+	local lRSAKEY_PASSWORD="dummypassword";
+	local lRSA_PRIV_KEY=$FOLDER_WORKSPACE$RSAKEY_PREFIX"_PRIV.pem";
+	local lRSA_PUB_KEY=$FOLDER_WORKSPACE$RSAKEY_PREFIX"_PUB.pem";
+	local lAESPASSWORD_enc=$FILE_AES_PASSWORD_DECRYPTED".enc";
 
 	# Get RSA_PRIV_KEY_PASSWORD
-	read -s -p "> Your private password: " lRSAKEY_PASSWORD
-	echo $lRSAKEY_PASSWORD > $FILE_RSA_PRIV_KEY_PASSWORD
-	echo .
-	echo $FILE_RSA_PRIV_KEY_PASSWORD
+	read -r -s -p "> Your private password: " lRSAKEY_PASSWORD
+	echo "$lRSAKEY_PASSWORD" > "$FILE_RSA_PRIV_KEY_PASSWORD"
 
 	echo "> GENKEY : START"
 	 
@@ -397,23 +417,23 @@ genkey()
 	file=$lRSA_PRIV_KEY
 	if [ -f "$file" ]
 	then
-		echo "WARNING ! $file already found."
-		exit 1
+		echo "WARNING ! $file already found.";
+		exit 1;
 	else
-		echo "Generating $lRSA_PRIV_KEY"
+		echo "Generating $lRSA_PRIV_KEY";
 		openssl genrsa -aes256 -passout file:"$FILE_RSA_PRIV_KEY_PASSWORD" -out "$lRSA_PRIV_KEY" 4096 -noout
 		checkError $?		
 	fi
 
 	# Generate random AES Password
-	file=$FILE_AES_PASSWORD_DECRYPTED
+	file=$FILE_AES_PASSWORD_DECRYPTED;
 	if [ -f "$file" ]
 	then
 		echo "WARNING ! $file already found."
 		exit 1		
 		exit
 	else
-		echo "Generate a 2048 bit (256 byte) random key"
+		echo "Generate a 2048 bit (256 byte) random key";
 		openssl rand -out "$FILE_AES_PASSWORD_DECRYPTED" 256
 		checkError $?
 	fi
@@ -430,18 +450,17 @@ genkey()
 	file=$lAESPASSWORD_enc
 	if [ -f "$file" ]
 	then
-		echo "WARNING ! $file already found."
-		exit 1
+		echo "WARNING ! $file already found.";
+		exit 1;
 	else
 		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -encrypt -inkey "$lRSA_PUB_KEY" -pubin -in "$FILE_AES_PASSWORD_DECRYPTED" -out "$lAESPASSWORD_enc"
 		checkError $?		
 	fi
 
 	# Remove secure file
-	purge $FILE_AES_PASSWORD_DECRYPTED
-	purge $FILE_RSA_PRIV_KEY_PASSWORD
+	autoPurge
 
-	echo "> GENKEY : DONE"
+	echo "> GENKEY : DONE";
 }
 
 #
@@ -477,8 +496,7 @@ menu()
 	done
 
 	# Remove secure file
-	purge $FILE_AES_PASSWORD_DECRYPTED
-	purge $FILE_RSA_PRIV_KEY_PASSWORD
+	autoPurge
 
 	exit
 }
@@ -490,19 +508,19 @@ menu()
 #
 checkOpenSSLfile()
 {
-	local file="$1"
+	local file="$1";
 
 	if [ ! -f "$file" ]
 	then
-		echo "$file not found."
-		exit 1
+		echo "$file not found.";
+		exit 1;
 	fi
 	
 	file="$2"
 	if [ ! -f "$file" ]
 	then
-		echo "$file not found."
-		exit 1
+		echo "$file not found.";
+		exit 1;
 	fi
 }
 
@@ -511,11 +529,11 @@ checkOpenSSLfile()
 #
 fileExist()
 {
-	local file="$1"
+	local file="$1";
 	if [ ! -f "$file" ]
 	then
-		echo "file $file not found."
-		exit 1
+		echo "file $file not found.";
+		exit 1;
 	fi
 }
 
@@ -524,11 +542,11 @@ fileExist()
 #
 folderExist()
 {
-	local folder="$1"
+	local folder="$1";
 	if [ ! -d "$folder" ]
 	then
-		echo "folder $folder not found."
-		exit 1
+		echo "folder $folder not found.";
+		exit 1;
 	fi
 }
 
@@ -539,21 +557,21 @@ folderExist()
 #
 checkfolder()
 {
-	local file="$1"
-	local myresult=0
+	local file="$1";
+	local myresult=0;
 
 	if [[ -d "$file" ]]
 	then
-		myresult=0
+		myresult=0;
 	elif [[ -f "$file" ]]
 	then
-		myresult=1
+		myresult=1;
 	else
-		echo "ERROR - $file is not valid"
-		exit 1
+		echo "ERROR - $file is not valid";
+		exit 1;
 	fi
 
-	echo "$myresult"
+	echo "$myresult";
 }
 
 #
@@ -562,51 +580,64 @@ checkfolder()
 extractkey()
 {
 	# Get AES KEY	
-	local file=""
-	local lRSAKEY_PASSWORD=""
+	local file="";
+	local lRSAKEY_PASSWORD="";
 
-    file=$FILE_RSA_PRIV_KEY_PASSWORD
+    file=$FILE_RSA_PRIV_KEY_PASSWORD;
 	if [ ! -f "$file" ]
 	then
-		read -s -p "> Your private password: " lRSAKEY_PASSWORD
-		echo $lRSAKEY_PASSWORD > $FILE_RSA_PRIV_KEY_PASSWORD
+		read -r -s -p "> Your private password: " lRSAKEY_PASSWORD;
+		echo "$lRSAKEY_PASSWORD" > "$FILE_RSA_PRIV_KEY_PASSWORD";
 	fi	
 
-	file=$FILE_AES_PASSWORD_DECRYPTED
+	file=$FILE_AES_PASSWORD_DECRYPTED;
 	if [ ! -f "$file" ]
 	then
-		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -decrypt -inkey "$FILE_RSA_PRIV_KEY" -in "$FILE_AES_PASSWORD_ENCRYPTED" -out "$file"
-		checkError $?
+		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -decrypt -inkey "$FILE_RSA_PRIV_KEY" -in "$FILE_AES_PASSWORD_ENCRYPTED" -out "$file";
+		checkError $?;
 	fi
 }
 
 checkError()
 {
-	if [ $1 -ne 0 ]; then
-		echo FAIL
+	if [ "$1" -ne 0 ]; then
+		echo FAIL;
 
 		# Remove secure file
-		purge "$FILE_AES_PASSWORD_DECRYPTED"
-		purge "$FILE_RSA_PRIV_KEY_PASSWORD"			
-		exit 1
+		autoPurge;	
+
+		exit 1;
 	fi
 }
 
+#
+# Remove secure file
+#
+autoPurge()
+{
+	purge "$FILE_AES_PASSWORD_DECRYPTED";
+	purge "$FILE_RSA_PRIV_KEY_PASSWORD";	
+}
+
+#
+# Remove file
+#
 purge()
 {
-	local lfile=$1
+	local lfile=$1;
 	
 	if [ -f "$lfile" ]
 	then
-		rm $lfile
+		rm "$lfile";
 	fi
 }
+
 
 ######
 # Main method
 ######
 main() {
-	menu
+	menu;
 }
 
 main "$@"
