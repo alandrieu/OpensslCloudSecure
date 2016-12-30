@@ -5,7 +5,12 @@
 #
 windowsPathConverter()
 {
-	if [[ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" || "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]]; then
+	local lUname;
+	lUname=$(uname -s);
+	local result;
+	result=$(expr substr "$lUname" 1 10);
+	
+	if [[ "$result" == "MINGW32_NT" || "$result" == "MINGW64_NT" ]]; then
 		# Do something under Windows NT platform
 		local lCONVERT;
 		lCONVERT=$(cygpath -p -w "$1");
