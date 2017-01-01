@@ -1,5 +1,7 @@
 #!/bin/bash
 
+declare -r RED='\033[0;31m'
+declare -r NC='\033[0m' # No Color
 #
 #
 #
@@ -71,7 +73,7 @@ encryptAES()
 	then
 		encryptFile "$TARGET";
 	else
-		echo "ERROR - $lResult is not valid";
+		echoerr "ERROR - $lResult is not valid";
 		exit 1;
 	fi
 }
@@ -109,9 +111,17 @@ encryptFile(){
 	BASE64_SAFE=$(echo "$ENCRYPTED_FILENAME" | tr '/' _);
 	local OUTPUT_FILENAME=$lOUTPUTDIR$BASE64_SAFE;
 	local OUTPUT_FILENAME_SING=$OUTPUT_FILENAME".sha256";
-	
+
+	if [ $(echo "$BASE64_SAFE" | wc -l) -gt 1 ];
+	then
+		echoerr "WARNING : File name is too long for base64 encoding [$fileName]";
+		exit 1;
+	fi 
+
 	# Encrypt 
-	openssl enc -aes-256-cbc -salt -in "$file" -out "$OUTPUT_FILENAME" -pass file:"$FILE_AES_PASSWORD_DECRYPTED";
+	local tempFile=$(windowsPathConverter "$file");
+	local tempOUTPUT_FILENAME=$(windowsPathConverter "$OUTPUT_FILENAME");
+	openssl enc -aes-256-cbc -salt -in "$tempFile" -out "$tempOUTPUT_FILENAME" -pass file:"$FILE_AES_PASSWORD_DECRYPTED";
 	checkError $?;
 
 	# Generate signature
@@ -129,8 +139,9 @@ encryptFile(){
 #
 # Recursive folder parsing
 #
-encryptFolder(){
-	local folderFullPath="";
+encryptFolder(){	
+
+	local folderFullPath;
 
 	for file in "$1"/*
 	do
@@ -140,7 +151,7 @@ encryptFolder(){
 		else
 			local folderName;
 			folderName=$(basename "${file}");
-	
+
 			if [ -n "$folderFullPath" ]
 			then
 				folderFullPath="$folderFullPath/$2";
@@ -151,7 +162,10 @@ encryptFolder(){
 			local result;
 			result=$(encryptFolderName "$folderName" "$folderFullPath");
 			result="$folderFullPath/$result";
+
+			# Parse folder
 			encryptFolder "${file}" "$result";
+			folderFullPath="";
 		fi
 	done
 
@@ -165,7 +179,7 @@ encryptFolder(){
 encryptFolderName(){
 	local folderName="$1";
 	local lOUTPUTDIR="$FOLDER_OUTPUT_ENCRYPTED_DATA";
-	
+
 	if [ -n "$2" ]
 	then
 		lOUTPUTDIR=$FOLDER_OUTPUT_ENCRYPTED_DATA$2"/";
@@ -210,7 +224,7 @@ decryptAES()
 	then
 		decryptFile "$TARGET";
 	else
-		echo "ERROR - $result is not valid";
+		echoerr "ERROR - $result is not valid";
 		exit 1;
 	fi
 }
@@ -249,7 +263,8 @@ decryptFile()
 	checkError $?;
 
 	# Decrypt file
-	openssl enc -d -aes-256-cbc -in "$file" -out "$lOUTPUTDIR$OUTPUT_FILENAME" -pass file:"$FILE_AES_PASSWORD_DECRYPTED";
+	local tempOUTPUTDIR=$(windowsPathConverter "$lOUTPUTDIR$OUTPUT_FILENAME");
+	openssl enc -d -aes-256-cbc -in "$file" -out "$tempOUTPUTDIR" -pass file:"$FILE_AES_PASSWORD_DECRYPTED";
 	checkError $?;
 
 	echo "> Decrypt $fileName : done";
@@ -315,6 +330,7 @@ decryptFolder(){
 			result=$(decryptFolderName "$folderName" "$folderFullPath");
 			result="$folderFullPath/$result";
 			decryptFolder "${file}" "$result";
+			folderFullPath="";
 		fi
 	done
 
@@ -439,7 +455,7 @@ genkey()
 	local file=$FILE_RSA_PRIV_KEY;
 	if [ -f "$file" ]
 	then
-		echo "WARNING ! $file already found.";
+		echoerr "WARNING ! $file already found.";
 		exit 1;
 	else
 		echo "Generating $FILE_RSA_PRIV_KEY";
@@ -451,7 +467,7 @@ genkey()
 	file=$FILE_AES_PASSWORD_DECRYPTED;
 	if [ -f "$file" ]
 	then
-		echo "WARNING ! $file already found.";
+		echoerr "WARNING ! $file already found.";
 		exit 1;	
 	else
 		echo "Generate a 2048 bit (256 byte) random key";
@@ -471,7 +487,7 @@ genkey()
 	file=$FILE_AES_PASSWORD_ENCRYPTED;
 	if [ -f "$file" ]
 	then
-		echo "WARNING ! $file already found.";
+		echoerr "WARNING ! $file already found.";
 		exit 1;
 	else
 		openssl rsautl -passin file:"$FILE_RSA_PRIV_KEY_PASSWORD" -encrypt -inkey "$FILE_RSA_PUB_KEY" -pubin -in "$FILE_AES_PASSWORD_DECRYPTED" -out "$FILE_AES_PASSWORD_ENCRYPTED";
@@ -544,7 +560,7 @@ fileExist()
 	local file="$1";
 	if [ ! -f "$file" ]
 	then
-		echo "file $file not found.";
+		echoerr "file $file not found.";
 		exit 1;
 	fi
 }
@@ -557,7 +573,7 @@ folderExist()
 	local folder="$1";
 	if [ ! -d "$folder" ]
 	then
-		echo "folder $folder not found.";
+		echoerr "folder $folder not found.";
 		exit 1;
 	fi
 }
@@ -579,7 +595,7 @@ checkfolder()
 	then
 		myresult=1;
 	else
-		echo "ERROR - $file is not valid";
+		echoerr "ERROR - $file is not valid";
 		exit 1;
 	fi
 
@@ -613,7 +629,7 @@ extractkey()
 checkError()
 {
 	if [ "$1" -ne 0 ]; then
-		echo FAIL;
+		echoerr "Script fail";
 
 		# Remove secure file
 		autoPurge;	
@@ -644,6 +660,12 @@ purge()
 	fi
 }
 
+#
+#
+# James Roth - < http://stackoverflow.com/questions/2990414/echo-that-outputs-to-stderr >
+echoerr() {
+	 echo -e "$RED$@$NC" 1>&2; 
+}
 
 ######
 # Main method
