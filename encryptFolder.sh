@@ -36,7 +36,7 @@ windowsPathConverter()
 	fi
 }
 
-declare -r FOLDER_WORKSPACE="/e/temp/OpenSSH/";
+declare -r FOLDER_WORKSPACE="/mnt/e/temp/OpenSSH/";
 declare -r TARGET="$3"; # File or Folder
 declare -r FILE_RSA_KEY_PREFIX=data;
 
