@@ -61,6 +61,7 @@ declare -r FILE_AES_PASSWORD_ENCRYPTED=$temp_FILE_AES_PASSWORD_ENCRYPTED;
 declare -r FOLDER_OUTPUT_ENCRYPTED_DATA=$PWD"/OUTPUT/";
 declare -r FOLDER_OUTPUT_DECRYPTED_DATA=$PWD"/OUTPUT_CLEAR/";
 
+
 encryptAES()
 {
 	local lResult;
@@ -103,7 +104,7 @@ encryptFile(){
 
 	# Encrypt File name
 	local ENCRYPTED_FILENAME;
-	ENCRYPTED_FILENAME=$(echo "$fileName" | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	ENCRYPTED_FILENAME=$(echo "$fileName" | openssl enc -base64 -A -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 	
 	# Convert base64 to base64 safe
@@ -115,6 +116,9 @@ encryptFile(){
 	if [ $(echo "$BASE64_SAFE" | wc -l) -gt 1 ];
 	then
 		echoerr "WARNING : File name is too long for base64 encoding [$fileName]";
+		
+		# Remove secure file
+		autoPurge;
 		exit 1;
 	fi 
 
@@ -194,7 +198,10 @@ encryptFolderName(){
 
 	# Encrypt File name
 	local ENCRYPTED_FOLDERNAME;
-	ENCRYPTED_FOLDERNAME=$(echo "$folderName" | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+#	local HASHED_ENCRYPTED_FOLDERNAME;
+	ENCRYPTED_FOLDERNAME=$(echo "$folderName" | openssl enc -base64 -A -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+#	HASHED_ENCRYPTED_FOLDERNAME=$(echo "$ENCRYPTED_FOLDERNAME" | openssl dgst -sha1);
+#	echo "HASH : $HASHED_ENCRYPTED_FOLDERNAME";
 	checkError $?;
 
 	# Convert base64 to base64 safe
@@ -206,6 +213,7 @@ encryptFolderName(){
 	if [ ! -d "$OUTPUT_FOLDERNAME" ]
 	then
 		mkdir "$OUTPUT_FOLDERNAME";
+		#touch "$lOUTPUTDIR""$BASE64_SAFE.manifest";
 	fi
 
 	#echo "> encrypt folder $folderName : done"
@@ -259,7 +267,7 @@ decryptFile()
 	local OUTPUT_FILENAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 
 	# Decrypt file
@@ -363,7 +371,7 @@ decryptFolderName(){
 	local OUTPUT_FOLDERNAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	DECRYPTED_FOLDERNAME=$(echo "$OUTPUT_FOLDERNAME" | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	DECRYPTED_FOLDERNAME=$(echo "$OUTPUT_FOLDERNAME" | openssl enc -base64 -d -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?
 
 	local OUTPUT_FOLDERNAME="$lOUTPUTDIR$DECRYPTED_FOLDERNAME";
@@ -399,7 +407,7 @@ decryptfromString()
 	local OUTPUT_FILENAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 
 	# Remove secure file
@@ -425,7 +433,7 @@ encryptfromString()
 
 	# Encrypt File name
 	local ENCRYPTED_STRING;
-	ENCRYPTED_STRING=$(echo "$fileName" | openssl enc -base64 -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	ENCRYPTED_STRING=$(echo "$fileName" | openssl enc -base64 -e -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 
 	# Convert base64 to base64 safe
@@ -653,7 +661,7 @@ autoPurge()
 purge()
 {
 	local lfile=$1;
-	
+
 	if [ -f "$lfile" ]
 	then
 		rm "$lfile";
