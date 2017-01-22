@@ -104,7 +104,7 @@ encryptFile(){
 
 	# Encrypt File name
 	local ENCRYPTED_FILENAME;
-	ENCRYPTED_FILENAME=$(echo "$fileName" | openssl enc -base64 -A -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	ENCRYPTED_FILENAME=$(echo "$fileName" | openssl enc -base64 -A -e -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 	
 	# Convert base64 to base64 safe
@@ -199,7 +199,7 @@ encryptFolderName(){
 	# Encrypt File name
 	local ENCRYPTED_FOLDERNAME;
 #	local HASHED_ENCRYPTED_FOLDERNAME;
-	ENCRYPTED_FOLDERNAME=$(echo "$folderName" | openssl enc -base64 -A -e -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	ENCRYPTED_FOLDERNAME=$(echo "$folderName" | openssl enc -base64 -A -e -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 #	HASHED_ENCRYPTED_FOLDERNAME=$(echo "$ENCRYPTED_FOLDERNAME" | openssl dgst -sha1);
 #	echo "HASH : $HASHED_ENCRYPTED_FOLDERNAME";
 	checkError $?;
@@ -237,6 +237,23 @@ decryptAES()
 	fi
 }
 
+decryptAES2()
+{
+	local result;
+	result=$(checkfolder "$TARGET");
+	
+	if [[ $result = "0" ]]
+	then
+		treefromFolder "$TARGET";
+	elif [[ $result = "1" ]]
+	then
+		treefromFolder "$TARGET";
+	else
+		echoerr "ERROR - $result is not valid";
+		exit 1;
+	fi
+}
+
 # 
 # Decrypt $1 file
 # [optional] add $2 like aditionnal folder
@@ -267,7 +284,7 @@ decryptFile()
 	local OUTPUT_FILENAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 
 	# Decrypt file
@@ -371,7 +388,7 @@ decryptFolderName(){
 	local OUTPUT_FOLDERNAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	DECRYPTED_FOLDERNAME=$(echo "$OUTPUT_FOLDERNAME" | openssl enc -base64 -d -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	DECRYPTED_FOLDERNAME=$(echo "$OUTPUT_FOLDERNAME" | openssl enc -base64 -d -A -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?
 
 	local OUTPUT_FOLDERNAME="$lOUTPUTDIR$DECRYPTED_FOLDERNAME";
@@ -407,13 +424,35 @@ decryptfromString()
 	local OUTPUT_FILENAME=$BASE64_SAFE;
 
 	# Decrypt filename
-	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 
 	# Remove secure file
 	autoPurge;
 
 	echo "> Decrypt : [$OUTPUT_FILENAME]";
+}
+
+decryptfromStringParam()
+{
+	local fileName="$1";
+
+    # If exist
+	checkOpenSSLfile "$FILE_AES_PASSWORD_ENCRYPTED" "$FILE_RSA_PRIV_KEY";
+
+	# Get AES KEY	
+	extractkey;
+
+	# Convert base64 safe to real base64
+	local BASE64_SAFE;
+	BASE64_SAFE=$(echo "$fileName" | tr _ '/');
+	local OUTPUT_FILENAME=$BASE64_SAFE;
+
+	# Decrypt filename
+	OUTPUT_FILENAME=$(echo "$OUTPUT_FILENAME" | openssl enc -base64 -d -A -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	checkError $?;
+
+	echo "$OUTPUT_FILENAME";
 }
 
 # 
@@ -433,7 +472,7 @@ encryptfromString()
 
 	# Encrypt File name
 	local ENCRYPTED_STRING;
-	ENCRYPTED_STRING=$(echo "$fileName" | openssl enc -base64 -e -A -aes-256-cbc -nosalt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
+	ENCRYPTED_STRING=$(echo "$fileName" | openssl enc -base64 -e -A -aes-256-cbc -salt -pass file:"$FILE_AES_PASSWORD_DECRYPTED");
 	checkError $?;
 
 	# Convert base64 to base64 safe
@@ -444,6 +483,36 @@ encryptfromString()
 	autoPurge;
 
 	echo "> Encrypt : [$BASE64_SAFE]";
+}
+
+# 
+# List encrypted Tree
+#
+treefromFolder()
+{
+	for file in "$1"/*
+	do
+		local onlyName;
+		onlyName=$(basename "${file}");
+
+		if [ ! -d "${file}" ]
+		then
+			local result;
+			local extension="${onlyName##*.}";
+
+			if [[ "$extension" != "sha256" ]]
+			then
+				result=$(decryptfromStringParam "$onlyName");
+				echo "$2├──${result}";
+			fi
+		else
+			local result;
+			result=$(decryptfromStringParam "$onlyName");
+			echo "$2├──${result}";
+
+			treefromFolder "${file}" "$2│   ";
+		fi
+	done
 }
 
 # 
@@ -514,7 +583,7 @@ genkey()
 menu()
 {
 	PS3='Please enter your choice: ';
-	options=("encrypt" "decrypt" "genkey" "decryptString" "encryptString" "Quit")
+	options=("encrypt" "decrypt" "genkey" "decryptString" "encryptString" "ls" "Quit")
 	select opt in "${options[@]}"
 	do
 		case $opt in
@@ -537,7 +606,11 @@ menu()
 			"encryptString")
 				encryptfromString;
 				break
-				;;								
+				;;	
+			"ls")
+				decryptAES2;
+				break
+				;;												
 			"Quit")
 				break
 				;;

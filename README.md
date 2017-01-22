@@ -9,7 +9,8 @@ Openssl script for securing files and folders in cloud storage.
 3. Generate KeyPair (RSA Private key and AES password)
 4. Encrypt string from input
 5. Decrypt string from input
-6. Exit script
+6. List encrypted files/folders
+7. Exit script
 
 ## Get Started 
 ### 1) Encrypt (recursive) :
@@ -43,4 +44,19 @@ Please enter your choice: 2
 > Output directory : /mnt/c/temp/FILES/OUTPUT_CLEAR//GNU GPL video (1 - 50)/
 > Check signature  : start
 Verified OK
+```
+
+### 3) List encrypted files/folders (recursive) :
+
+```bash
+root@TESTING-DEB:/mnt/c/temp/FILES# ./build.sh && ./encryptFolder.sh /mnt/e/temp/OpenSSH/data_PRIV.pem /mnt/e/temp/OpenSSH/key.bin.enc ./OUTPUT/
+1) encrypt        3) genkey         5) encryptString  7) Quit
+2) decrypt        4) decryptString  6) ls
+Please enter your choice: 6
+├──Video
+│   ├──GNU GPL video
+│   │   ├──GNU GPL - 01.mp4
+│   │   ├──GNU GPL - 01.mkv
+│   │   ├──GNU GPL - 01.avi
+root@WINDOWS-WORK-PC:/mnt/c/temp/FILES#
 ```
